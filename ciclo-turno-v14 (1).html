@@ -1,0 +1,2386 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>App do Turno — v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0D12; --shell:#0D1117; --panel:#12161D; --panel-hover:#171C24; --panel-alt:#151A21;
+    --border:#212831; --border-soft:#1A2028;
+    --text:#EDF1F6; --text-muted:#8E97A7; --text-dim:#5B6472;
+    --brand:#4C8DFF; --brand-soft:#8CB4FF; --brand-dim:#16233D;
+    --accent:#F2994A; --accent-soft:#FFB877; --accent-dim:#3D2E1C;
+    --done:#2FBE73; --done-dim:#132920;
+    --progress:#F2994A; --progress-dim:#2E2412;
+    --pending:#4b5563; --pending-dim:#171B21;
+    --alert:#F0555A; --alert-dim:#2B1A1B;
+    --r-lg:16px; --r-md:10px; --r-sm:8px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    background-image:radial-gradient(circle at 10% -10%, #1B2433 0%, transparent 42%),
+                      radial-gradient(circle at 100% 110%, #171C25 0%, transparent 45%);
+    height:100vh; width:100vw; margin:0; padding:0; overflow:hidden;
+    font-family:'IBM Plex Sans', sans-serif; color:var(--text); -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  svg{ display:block; }
+  button{ font-family:inherit; }
+
+  .shell{
+    width:100vw; height:100vh; background:transparent;
+    border:none; border-radius:0; overflow:hidden;
+    box-shadow:none;
+    position:relative; display:flex; flex-direction:row;
+  }
+  .shell-scroll{ flex:1; min-height:0; min-width:0; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .statusbar{ display:none; }
+
+  .bottom-tabs{
+    flex-shrink:0; width:232px; display:none; flex-direction:column;
+    border-right:1px solid var(--border); background:var(--shell); padding:18px 12px;
+  }
+  .bottom-tabs.show{ display:flex; }
+  .sidebar-brand{
+    display:flex; align-items:center; gap:9px; padding:4px 10px 22px;
+    font-size:13px; font-weight:700; color:var(--text); border-bottom:1px solid var(--border-soft); margin-bottom:14px;
+  }
+  .sidebar-brand svg{ color:var(--brand); flex-shrink:0; }
+  .bt-item{
+    flex-direction:row; align-items:center; gap:11px; padding:10px 12px;
+    cursor:pointer; color:var(--text-dim); transition:all .15s ease; border-radius:var(--r-sm);
+  }
+  .bt-item:hover{ background:var(--panel-hover); color:var(--text-muted); }
+  .bt-item svg{ width:18px; height:18px; flex-shrink:0; }
+  .bt-item span{ font-size:12.5px; font-weight:600; }
+  .bt-item.active{ color:var(--brand); background:var(--brand-dim); }
+
+  .view{ display:none; }
+  .view.active{ display:block; animation:fadein .25s ease; max-width:640px; margin:0 auto; padding:0 8px; }
+  @keyframes fadein{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  /* ---------- shared ---------- */
+  .eyebrow{
+    font-size:10.5px; font-weight:600; letter-spacing:.16em; color:var(--brand);
+    text-transform:uppercase; margin:0 0 7px; display:flex; align-items:center; gap:7px;
+  }
+  .eyebrow::before{ content:''; width:5px; height:5px; border-radius:50%; background:var(--brand); box-shadow:0 0 8px 1px rgba(76,141,255,.6); }
+  .app-title{ font-size:20px; font-weight:700; margin:0 0 2px; letter-spacing:-.015em; }
+  .app-sub{ font-size:12.5px; color:var(--text-muted); margin:0; }
+
+  /* ================= LOGIN ================= */
+  #view-login .head{ padding:26px 24px 6px; text-align:center; }
+  #view-login .head .eyebrow{ justify-content:center; }
+  #view-login .lock-icon{
+    width:44px; height:44px; border-radius:14px; margin:14px auto 4px;
+    background:linear-gradient(150deg,#1d2432,#151a23); border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center; color:var(--brand);
+  }
+
+  .operator-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:18px 22px 4px; }
+  .op-card{
+    background:var(--panel); border:1.5px solid var(--border); border-radius:10px;
+    padding:14px 10px; text-align:center; cursor:pointer; transition:all .15s ease;
+  }
+  .op-card:hover{ border-color:#3a4558; background:var(--panel-hover); }
+  .op-card.selected{ border-color:var(--brand); background:var(--brand-dim); }
+  .op-avatar{
+    width:46px; height:46px; border-radius:50%; margin:0 auto 8px;
+    background:linear-gradient(150deg,#3d4a5e,#232b37); border:1px solid #3a4558;
+    display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:600;
+    overflow:hidden;
+  }
+  .op-avatar img{ width:100%; height:100%; object-fit:cover; }
+  .op-name{ font-size:12px; font-weight:600; margin-bottom:2px; }
+  .op-role{ font-size:9.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px; }
+  .op-mat{ font-size:10px; color:var(--text-dim); }
+
+  .add-op-btn{
+    margin:14px 22px 0; width:calc(100% - 44px);
+    background:var(--panel); border:1.5px dashed var(--border); border-radius:10px;
+    padding:12px; text-align:center; color:var(--text-muted); font-size:12.5px; font-weight:600;
+    cursor:pointer; transition:all .15s ease;
+  }
+  .add-op-btn:hover{ border-color:var(--brand); color:var(--brand-soft); }
+
+  .company-chip{
+    margin:14px 22px 0; display:flex; align-items:center; justify-content:space-between;
+    background:var(--panel-alt); border:1px solid var(--border); border-radius:9px; padding:9px 12px;
+    font-size:11.5px; color:var(--text-muted); cursor:pointer; transition:all .15s ease;
+  }
+  .company-chip:hover{ border-color:#3a4558; }
+  .company-chip .cc-left{ display:flex; align-items:center; gap:8px; min-width:0; }
+  .company-chip .cc-left svg{ color:var(--text-dim); flex-shrink:0; }
+  .company-chip .cc-text{ overflow:hidden; }
+  .company-chip .cc-name{ font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .company-chip .cc-cnpj{ font-size:10px; color:var(--text-dim); }
+  .company-chip .cc-edit{ font-size:10.5px; color:var(--brand-soft); font-weight:600; flex-shrink:0; }
+
+  /* pin pad (used in login + cadastro) */
+  .pin-panel{ padding:20px 24px 26px; text-align:center; }
+  .pin-panel.hidden{ display:none; }
+  .pin-who{ font-size:13px; font-weight:600; margin-bottom:2px; }
+  .pin-hint{ font-size:11px; color:var(--text-dim); margin-bottom:16px; }
+  .pin-dots{ display:flex; justify-content:center; gap:12px; margin-bottom:20px; }
+  .pin-dot{ width:12px; height:12px; border-radius:50%; border:1.5px solid var(--border); background:var(--panel); transition:all .12s ease; }
+  .pin-dot.filled{ background:var(--brand); border-color:var(--brand); }
+  .keypad{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:230px; margin:0 auto; }
+  .key{
+    aspect-ratio:1; border-radius:14px; background:var(--panel); border:1px solid var(--border);
+    color:var(--text); font-size:17px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:all .1s ease;
+  }
+  .key:hover{ background:var(--panel-hover); border-color:#3a4558; }
+  .key:active{ transform:scale(.94); }
+  .key.ghost{ background:transparent; border:none; color:var(--text-dim); }
+
+  /* ================= CADASTRO ================= */
+  #view-cadastro .head{ padding:22px 24px 4px; }
+  .back-link{
+    display:inline-flex; align-items:center; gap:5px; color:var(--text-dim); font-size:12px;
+    cursor:pointer; margin-bottom:14px; font-weight:500;
+  }
+  .back-link:hover{ color:var(--text-muted); }
+
+  .avatar-upload{
+    width:78px; height:78px; border-radius:50%; margin:6px auto 18px;
+    background:var(--panel-alt); border:1.5px dashed var(--border);
+    display:flex; align-items:center; justify-content:center; color:var(--text-dim);
+    cursor:pointer; position:relative; overflow:hidden; transition:border-color .15s ease;
+  }
+  .avatar-upload:hover{ border-color:var(--brand); color:var(--brand-soft); }
+  .avatar-upload img{ width:100%; height:100%; object-fit:cover; position:absolute; inset:0; }
+
+  .form-group{ padding:0 24px; margin-bottom:14px; }
+  .form-label{ font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block; }
+  .form-input{
+    width:100%; background:var(--panel); border:1px solid var(--border); border-radius:11px;
+    padding:11px 13px; color:var(--text); font-size:13.5px; font-family:inherit; outline:none;
+  }
+  .form-input:focus{ border-color:var(--brand); }
+  .form-input.mono{ font-family:'IBM Plex Mono',monospace; }
+
+  .segmented{ display:flex; background:var(--panel); border:1px solid var(--border); border-radius:11px; padding:3px; }
+  .seg-opt{
+    flex:1; text-align:center; padding:8px 0; border-radius:8px; font-size:12.5px; font-weight:600;
+    color:var(--text-muted); cursor:pointer; transition:all .15s ease;
+  }
+  .seg-opt.active{ background:var(--brand-dim); color:var(--brand-soft); }
+
+  .primary-btn{
+    margin:20px 24px 8px; width:calc(100% - 48px);
+    background:linear-gradient(150deg,var(--brand),#2f6fe0); border:none; border-radius:9px;
+    padding:13px; color:#071328; font-size:13.5px; font-weight:700; cursor:pointer;
+    box-shadow:0 8px 20px -8px rgba(76,141,255,0.5);
+  }
+  .primary-btn:hover{ filter:brightness(1.05); }
+  .primary-btn:disabled{ opacity:.4; cursor:not-allowed; box-shadow:none; }
+
+  /* ================= TURNO (existing) ================= */
+  header.app-head{ padding:16px 22px 14px; }
+  .logout-link{ font-size:11px; color:var(--text-dim); cursor:pointer; }
+  .logout-link:hover{ color:var(--alert); }
+
+  .encerrar-btn{
+    margin:14px 22px 0; display:flex; align-items:center; justify-content:center; gap:8px;
+    background:var(--panel); border:1.5px solid var(--border); border-radius:9px;
+    padding:12px; font-size:12.5px; font-weight:700; color:var(--text-muted); cursor:pointer;
+    transition:all .15s ease;
+  }
+  .encerrar-btn:hover{ border-color:var(--brand); color:var(--brand-soft); }
+  .encerrar-btn svg{ width:15px; height:15px; }
+
+  .edit-carga-btn{
+    font-size:10.5px; font-weight:600; color:var(--brand-soft); cursor:pointer;
+    background:var(--panel); border:1px solid var(--border); padding:3px 9px; border-radius:20px;
+    text-transform:none; letter-spacing:0;
+  }
+  .edit-carga-btn:hover{ border-color:var(--brand); }
+
+  .summary-box{
+    margin:0 24px 16px; border-radius:10px; padding:14px; font-size:12.5px; line-height:1.6;
+  }
+  .summary-box.ok{ background:var(--done-dim); border:1px solid #265c3c; color:#a8e8c0; }
+  .summary-box.warn{ background:var(--alert-dim); border:1px solid #5c3131; color:#f0b8b8; }
+  .summary-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:8px 0; border-bottom:1px solid rgba(255,255,255,.06); font-size:12px;
+  }
+  .summary-row:last-child{ border-bottom:none; }
+  .summary-row-name{ font-weight:600; }
+
+  /* ---- seleção de carga ---- */
+  .carga-list-item{
+    background:var(--panel); border:1.5px solid var(--border); border-radius:10px;
+    padding:14px; cursor:pointer; transition:all .15s ease;
+  }
+  .carga-list-item:hover{ border-color:#3a4558; background:var(--panel-hover); }
+  .carga-list-item.is-complete{ opacity:.6; }
+  .cli-top{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+  .cli-id{ font-size:10px; color:var(--text-dim); margin-bottom:3px; }
+  .cli-cliente{ font-size:14px; font-weight:700; margin:0; }
+  .cli-progress{ font-size:11px; font-weight:700; font-family:'IBM Plex Mono',monospace; color:var(--brand-soft); white-space:nowrap; }
+  .cli-meta{ font-size:11px; color:var(--text-dim); }
+  .cli-bar{ height:5px; border-radius:4px; background:var(--border); overflow:hidden; margin-top:10px; }
+  .cli-bar-fill{ height:100%; background:var(--brand); }
+
+  /* ---- colaboradores / timeline (painel) ---- */
+  .colab-row{
+    display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border-soft);
+  }
+  .colab-row:last-child{ border-bottom:none; }
+  .colab-avatar{
+    width:30px; height:30px; border-radius:50%; background:linear-gradient(150deg,#3d4a5e,#232b37);
+    border:1px solid #3a4558; display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:600; color:var(--text); overflow:hidden; flex-shrink:0;
+  }
+  .colab-avatar img{ width:100%; height:100%; object-fit:cover; }
+  .colab-info{ flex:1; min-width:0; }
+  .colab-name{ font-size:12.5px; font-weight:600; }
+  .colab-meta{ font-size:10.5px; color:var(--text-dim); }
+  .colab-count{ font-size:11px; color:var(--text-dim); font-family:'IBM Plex Mono',monospace; }
+
+  .evento-row{ display:flex; gap:10px; padding:9px 0; border-bottom:1px solid var(--border-soft); }
+  .evento-row:last-child{ border-bottom:none; }
+  .evento-time{ font-size:10px; color:var(--text-dim); font-family:'IBM Plex Mono',monospace; width:42px; flex-shrink:0; padding-top:1px; }
+  .evento-body{ flex:1; min-width:0; }
+  .evento-title{ font-size:12px; font-weight:600; }
+  .evento-sub{ font-size:10.5px; color:var(--text-dim); }
+  .empty-note{ font-size:11.5px; color:var(--text-dim); font-style:italic; padding:6px 0; }
+
+  .produto-row{
+    display:flex; gap:8px; align-items:center;
+    background:var(--panel); border:1px solid var(--border); border-radius:11px; padding:9px 10px;
+  }
+  .produto-row input.form-input{ padding:8px 10px; font-size:12.5px; }
+  .produto-row .prod-nome{ flex:1; min-width:0; }
+  .produto-row .prod-qtd{ width:64px; flex-shrink:0; }
+  .produto-row .prod-rm{ color:var(--text-dim); cursor:pointer; font-size:16px; padding:0 4px; flex-shrink:0; }
+  .produto-row .prod-rm:hover{ color:var(--alert); }
+
+  .motorista-chip{
+    font-size:11.5px; font-weight:600; padding:6px 12px; border-radius:20px;
+    background:var(--panel); border:1px solid var(--border); color:var(--text-muted); cursor:pointer;
+  }
+  .motorista-chip:hover{ border-color:var(--brand); color:var(--brand-soft); }
+
+  .motorista-info-box{
+    background:var(--panel-alt); border:1px solid var(--border); border-radius:11px;
+    padding:10px 12px; margin-top:9px; display:flex; align-items:center; gap:10px;
+  }
+  .motorista-info-box .mi-cnh{ width:38px; height:26px; border-radius:5px; object-fit:cover; flex-shrink:0; background:var(--panel); }
+  .motorista-info-box .mi-text{ font-size:11.5px; line-height:1.5; }
+  .motorista-info-box .mi-text b{ color:var(--text); }
+
+  .viagem-list-item{
+    background:var(--panel); border:1.5px solid var(--border); border-radius:9px;
+    padding:11px 13px; cursor:pointer; transition:all .15s ease;
+  }
+  .viagem-list-item:hover{ border-color:var(--brand); background:var(--panel-hover); }
+  .viagem-list-item .vli-top{ display:flex; justify-content:space-between; align-items:center; margin-bottom:3px; }
+  .viagem-list-item .vli-dt{ font-size:12.5px; font-weight:700; }
+  .viagem-list-item .vli-count{ font-size:10.5px; color:var(--brand-soft); font-family:'IBM Plex Mono',monospace; }
+  .viagem-list-item .vli-meta{ font-size:11px; color:var(--text-dim); }
+  .you-row{
+    margin-top:16px; display:flex; align-items:center; justify-content:space-between;
+    background:linear-gradient(155deg, var(--panel), var(--panel-alt));
+    border:1px solid var(--border); border-radius:10px; padding:11px 13px;
+  }
+  .you-id{ display:flex; align-items:center; gap:10px; }
+  .avatar{
+    width:34px; height:34px; border-radius:50%; background:linear-gradient(150deg,#3d4a5e,#232b37);
+    display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; color:var(--text);
+    border:1px solid #3a4558; overflow:hidden;
+  }
+  .avatar img{ width:100%; height:100%; object-fit:cover; }
+  .you-name{ font-size:13px; font-weight:600; line-height:1.25; }
+  .you-mat{ font-size:10.5px; color:var(--text-dim); line-height:1.3; }
+  .turno-code{ text-align:right; font-size:10.5px; color:var(--text-dim); line-height:1.5; }
+  .turno-code b{ color:var(--text-muted); font-weight:600; }
+
+  .tabnav{ display:flex; gap:6px; padding:16px 22px 0; }
+  .tabbtn{
+    flex:1; text-align:center; padding:8px 4px; border-radius:10px;
+    background:var(--panel); border:1px solid var(--border); cursor:pointer; transition:all .15s ease;
+  }
+  .tabbtn:hover{ border-color:#354056; background:var(--panel-hover); }
+  .tabbtn-icon{ width:16px; height:16px; margin:0 auto 3px; color:var(--text-dim); }
+  .tabbtn-label{ font-size:10px; font-weight:600; color:var(--text-dim); margin-bottom:2px; }
+  .tabbtn-value{ font-size:11.5px; font-weight:700; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; }
+  .tabbtn-value.state-done{ color:#8fe0af; }
+  .tabbtn-value.state-alert{ color:#ff9d9d; }
+  .tabbtn-value.state-progress{ color:var(--accent-soft); }
+  .tabbtn-value.state-pending{ color:var(--text-dim); }
+
+  .banner{
+    margin:16px 22px 0; background:linear-gradient(155deg, var(--alert-dim), #24161a);
+    border:1px solid #4a2626; border-radius:10px; padding:13px 14px; display:flex; gap:11px;
+  }
+  .banner svg{ flex-shrink:0; color:var(--alert); margin-top:1px; }
+  .banner-title{ font-size:12.5px; font-weight:600; color:#ffb4b4; margin:0 0 3px; }
+  .banner-body{ font-size:11.8px; color:#cf9d9d; line-height:1.5; margin:0; }
+  .banner-body b{ color:#ffcccc; }
+
+  .carga-section{ padding:22px 22px 4px; scroll-margin-top:20px; }
+  .section-label{
+    font-size:11px; font-weight:600; letter-spacing:.12em; color:var(--text-dim);
+    text-transform:uppercase; margin:0 0 12px; padding-left:2px; display:flex; align-items:center; justify-content:space-between;
+  }
+  .section-label .count{
+    font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--text-dim);
+    background:var(--panel); border:1px solid var(--border); padding:2px 8px; border-radius:20px; text-transform:none; letter-spacing:0;
+  }
+  .carga-card{
+    background:linear-gradient(160deg, #171E28 0%, #131720 100%); border:1px solid var(--border);
+    border-radius:12px; padding:18px; position:relative; overflow:hidden;
+  }
+  .carga-card::after{
+    content:''; position:absolute; top:-40%; right:-20%; width:220px; height:220px; border-radius:50%;
+    background:radial-gradient(circle, rgba(76,141,255,0.07), transparent 70%); pointer-events:none;
+  }
+  .carga-top{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; }
+  .carga-id{ font-size:10.5px; color:var(--text-dim); margin-bottom:4px; }
+  .carga-id b{ color:var(--brand-soft); }
+  .carga-cliente{ font-size:15px; font-weight:700; margin:0 0 3px; letter-spacing:-.01em; }
+  .carga-endereco{ font-size:11.5px; color:var(--text-muted); line-height:1.4; max-width:230px; }
+  .carga-meta{ text-align:right; font-size:10.5px; color:var(--text-dim); line-height:1.6; }
+  .carga-meta b{ color:var(--text-muted); }
+  .status-row{
+    display:flex; align-items:center; gap:9px; background:var(--progress-dim); border:1px solid #4a3820;
+    border-radius:9px; padding:10px 12px; margin-bottom:16px;
+  }
+  .status-row svg{ color:var(--brand); flex-shrink:0; }
+  .status-row-text{ font-size:12px; line-height:1.4; }
+  .status-row-text b{ color:var(--brand-soft); font-weight:600; }
+  .status-row.blocked{ background:var(--alert-dim); border-color:#5c3131; }
+  .status-row.blocked svg{ color:var(--alert); }
+  .status-row.blocked .status-row-text b{ color:#ff9d9d; }
+  .status-row.done-all{ background:var(--done-dim); border-color:#265c3c; }
+  .status-row.done-all svg{ color:var(--done); }
+  .status-row-time{ margin-left:auto; font-size:10.5px; color:var(--text-dim); font-family:'IBM Plex Mono',monospace; white-space:nowrap; }
+
+  .stepper{ padding:2px 2px 0; }
+  .stepper-line-wrap{ position:relative; height:4px; margin:0 5px 10px; }
+  .stepper-line-bg{ position:absolute; inset:0; background:var(--border); border-radius:4px; }
+  .stepper-line-fill{ position:absolute; top:0; left:0; bottom:0; background:linear-gradient(90deg,var(--done),var(--brand)); border-radius:4px; }
+  .stepper-nodes{ display:flex; justify-content:space-between; margin:0 -1px; }
+  .step-node{ width:11px; height:11px; border-radius:50%; background:var(--panel); border:2px solid var(--border); }
+  .step-node.done{ background:var(--done); border-color:var(--done); }
+  .step-node.current{ background:var(--brand); border-color:var(--brand); box-shadow:0 0 0 4px rgba(76,141,255,0.22); }
+  .step-node.blocked{ background:var(--alert); border-color:var(--alert); box-shadow:0 0 0 4px rgba(240,85,90,0.22); }
+  .stepper-caption{ display:flex; justify-content:space-between; margin-top:9px; font-size:10px; color:var(--text-dim); }
+  .stepper-caption .current-label{ color:var(--brand-soft); font-weight:600; }
+  .stepper-caption .current-label.is-blocked{ color:#ff9d9d; }
+
+  .area{ padding:22px 22px 4px; scroll-margin-top:20px; }
+  .timeline{ list-style:none; margin:0; padding:0; position:relative; }
+  .stage{ position:relative; padding-left:40px; padding-bottom:20px; }
+  .stage:last-child{ padding-bottom:0; }
+  .stage-line{ position:absolute; left:14px; top:28px; bottom:-2px; width:2px; background:var(--border); }
+  .stage:last-child .stage-line{ display:none; }
+  .stage-line.handoff{ background:repeating-linear-gradient(to bottom, var(--accent) 0 4px, transparent 4px 8px); }
+  .marker{
+    position:absolute; left:0; top:0; width:30px; height:30px; border-radius:10px; display:flex; align-items:center;
+    justify-content:center; border:1.5px solid var(--border); background:var(--panel); color:var(--text-dim); z-index:1;
+  }
+  .marker svg{ width:15px; height:15px; }
+  .marker.done{ background:var(--done-dim); border-color:var(--done); color:var(--done); }
+  .marker.progress{ background:var(--progress-dim); border-color:var(--progress); color:var(--progress); }
+  .marker.pending{ background:var(--panel); border-color:var(--border); color:var(--text-dim); }
+  .marker.alert{ background:var(--alert-dim); border-color:var(--alert); color:#ff9d9d; }
+  .handoff-tag{
+    position:absolute; left:40px; top:-10px; font-size:9.5px; font-weight:600; color:var(--accent);
+    background:var(--accent-dim); border:1px solid #5c4527; padding:2px 8px; border-radius:20px; letter-spacing:.02em;
+    display:flex; align-items:center; gap:4px;
+  }
+  .card{ background:var(--panel); border:1px solid var(--border); border-radius:9px; overflow:hidden; transition:all .15s ease; }
+  .card:hover{ background:var(--panel-hover); border-color:#2e3846; }
+  .card.open{ border-color:#3a4558; }
+  .stage.locked .marker{ opacity:.4; }
+  .stage.locked .card{ opacity:.5; cursor:not-allowed; }
+  .stage.locked .card:hover{ background:var(--panel); border-color:var(--border); }
+  .stage.locked .chev{ display:none; }
+  .card-head{ padding:12px 13px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .ch-left{ min-width:0; }
+  .stage-role{ font-size:10px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.06em; margin:0 0 3px; }
+  .stage-name{ font-size:14px; font-weight:600; margin:0; }
+  .stage-preview{
+    font-size:11px; color:var(--text-dim); margin:4px 0 0; line-height:1.4;
+    display:flex; align-items:center; gap:6px; max-width:230px;
+  }
+  .stage-preview .snippet{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .stage-preview .attach-count{
+    display:inline-flex; align-items:center; gap:3px; flex-shrink:0;
+    color:var(--text-muted); background:var(--panel-alt); border:1px solid var(--border);
+    padding:1px 6px; border-radius:20px; font-size:10px;
+  }
+  .stage-preview .attach-count svg{ width:10px; height:10px; }
+  .stage-preview.empty{ color:var(--text-dim); font-style:italic; }
+  .ch-right{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+  .pill{ font-size:10.5px; font-weight:600; padding:4px 10px; border-radius:20px; white-space:nowrap; }
+  .pill.done{ background:var(--done-dim); color:#6fe3a0; }
+  .pill.progress{ background:var(--progress-dim); color:#ffb877; }
+  .pill.pending{ background:var(--pending-dim); color:var(--text-muted); }
+  .pill.alert{ background:var(--alert-dim); color:#ff9d9d; }
+  .chev{ width:16px; height:16px; color:var(--text-dim); transition:transform .18s ease; flex-shrink:0; }
+  .card.open .chev{ transform:rotate(180deg); }
+  .card-body{ max-height:0; overflow:hidden; transition:max-height .25s ease; }
+  .card.open .card-body{ max-height:420px; }
+  .card-body-inner{ padding:2px 13px 15px; border-top:1px solid var(--border); }
+  .operator-row{ display:flex; align-items:center; gap:8px; margin:12px 0 12px; font-size:11.5px; color:var(--text-muted); }
+  .operator-row .mono{ color:var(--text); }
+  .operator-row .tag-unassigned{ color:var(--text-dim); font-style:italic; }
+  .chip-row{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .chip{
+    font-size:11px; font-weight:600; padding:6px 11px; border-radius:20px; border:1px solid var(--border);
+    background:var(--panel-alt); color:var(--text-muted); cursor:pointer; transition:all .12s ease;
+  }
+  .chip:hover{ border-color:#3a4558; }
+  .chip.active-done{ background:var(--done-dim); border-color:var(--done); color:#6fe3a0; }
+  .chip.active-progress{ background:var(--progress-dim); border-color:var(--progress); color:#ffb877; }
+  .chip.active-pending{ background:var(--pending-dim); border-color:var(--pending); color:var(--text-muted); }
+  .chip.active-alert{ background:var(--alert-dim); border-color:var(--alert); color:#ff9d9d; }
+  textarea{
+    width:100%; min-height:50px; resize:vertical; background:var(--panel-alt); border:1px solid var(--border);
+    border-radius:10px; color:var(--text); font-family:'IBM Plex Sans',sans-serif; font-size:12.5px; padding:9px 10px; outline:none;
+  }
+  textarea:focus{ border-color:var(--brand); }
+  textarea::placeholder{ color:var(--text-dim); }
+
+  /* attachments */
+  .attach-row{ margin-top:9px; }
+  .attach-btn{
+    display:inline-flex; align-items:center; gap:6px; background:var(--panel-alt); border:1px dashed var(--border);
+    border-radius:9px; padding:7px 11px; font-size:11px; font-weight:600; color:var(--text-muted); cursor:pointer;
+    transition:all .12s ease;
+  }
+  .attach-btn:hover{ border-color:var(--brand); color:var(--brand-soft); }
+  .attach-chips{ display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
+  .attach-chip{
+    position:relative; display:flex; align-items:center; gap:6px; background:var(--panel-alt);
+    border:1px solid var(--border); border-radius:9px; padding:5px 8px 5px 5px; font-size:10.5px; color:var(--text-muted);
+  }
+  .attach-chip .thumb{
+    width:24px; height:24px; border-radius:5px; object-fit:cover; background:var(--panel); flex-shrink:0;
+  }
+  .attach-chip .file-ic{
+    width:24px; height:24px; border-radius:5px; background:var(--panel); display:flex; align-items:center; justify-content:center;
+    color:var(--text-dim); flex-shrink:0;
+  }
+  .attach-chip .fname{ max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .attach-chip .rm{ cursor:pointer; color:var(--text-dim); font-size:13px; line-height:1; padding:0 2px; }
+  .attach-chip .rm:hover{ color:var(--alert); }
+
+  .foot-note{ padding:24px 28px 26px; text-align:center; font-size:11px; color:var(--text-dim); line-height:1.65; }
+
+  /* ---- painel de acompanhamento (live) ---- */
+  .painel-card{
+    background:linear-gradient(160deg, #171E28 0%, #131720 100%); border:1px solid var(--border);
+    border-radius:12px; padding:18px; position:relative; overflow:hidden;
+  }
+  .painel-top{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px; }
+  .kpi-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .kpi-tile{
+    background:var(--panel); border:1px solid var(--border); border-left:3px solid var(--border);
+    border-radius:var(--r-sm); padding:12px 13px;
+  }
+  .kpi-tile .kt-value{ font-size:22px; font-weight:700; font-family:'IBM Plex Mono',monospace; letter-spacing:-.02em; line-height:1.1; }
+  .kpi-tile .kt-label{ font-size:10.5px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; margin-top:4px; }
+  .kpi-tile.k-done{ border-left-color:var(--done); } .kpi-tile.k-done .kt-value{ color:#8fe0af; }
+  .kpi-tile.k-alert{ border-left-color:var(--alert); } .kpi-tile.k-alert .kt-value{ color:#ff9d9d; }
+  .kpi-tile.k-progress{ border-left-color:var(--accent); } .kpi-tile.k-progress .kt-value{ color:var(--accent-soft); }
+  .kpi-tile.k-pending{ border-left-color:var(--pending); } .kpi-tile.k-pending .kt-value{ color:var(--text-muted); }
+  .painel-updated{ font-size:10px; color:var(--text-dim); }
+
+  .painel-bar-wrap{ height:8px; border-radius:6px; background:var(--border); overflow:hidden; margin-bottom:12px; display:flex; }
+  .painel-bar-seg{ height:100%; transition:width .3s ease; }
+  .painel-bar-seg.done{ background:var(--done); }
+  .painel-bar-seg.alert{ background:var(--alert); }
+  .painel-bar-seg.progress{ background:var(--progress); }
+
+  .painel-chips{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+  .painel-chip{
+    display:flex; align-items:center; gap:5px; font-size:11px; font-weight:600;
+    padding:5px 10px; border-radius:20px; border:1px solid var(--border); background:var(--panel-alt); color:var(--text-muted);
+  }
+  .painel-chip .dot{ width:6px; height:6px; border-radius:50%; }
+  .painel-chip.done .dot{ background:var(--done); } .painel-chip.done{ color:#8fe0af; }
+  .painel-chip.alert .dot{ background:var(--alert); } .painel-chip.alert{ color:#ff9d9d; }
+  .painel-chip.progress .dot{ background:var(--progress); } .painel-chip.progress{ color:#ffb877; }
+  .painel-chip.pending .dot{ background:var(--pending); }
+
+  .painel-list-label{ font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--text-dim); margin:0 0 8px; }
+
+  .painel-row{
+    display:flex; align-items:center; gap:11px; padding:9px 0;
+    border-bottom:1px solid var(--border-soft);
+  }
+  .painel-row:last-child{ border-bottom:none; padding-bottom:0; }
+  .painel-row:first-child{ padding-top:0; }
+  .painel-row.is-locked{ opacity:.4; }
+  .painel-ic{
+    width:28px; height:28px; border-radius:9px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    border:1.5px solid var(--border); background:var(--panel); color:var(--text-dim);
+  }
+  .painel-ic svg{ width:13px; height:13px; }
+  .painel-ic.done{ background:var(--done-dim); border-color:var(--done); color:var(--done); }
+  .painel-ic.progress{ background:var(--progress-dim); border-color:var(--progress); color:var(--progress); }
+  .painel-ic.pending{ background:var(--panel); border-color:var(--border); color:var(--text-dim); }
+  .painel-ic.alert{ background:var(--alert-dim); border-color:var(--alert); color:#ff9d9d; }
+  .painel-row-main{ flex:1; min-width:0; }
+  .painel-row-name{ font-size:12.5px; font-weight:600; margin:0 0 2px; }
+  .painel-row-meta{ font-size:10.5px; color:var(--text-dim); display:flex; align-items:center; gap:6px; overflow:hidden; }
+  .painel-row-meta .mono{ color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+</style>
+</head>
+<body>
+
+<div class="shell" id="top">
+
+  <nav class="bottom-tabs" id="bottom-tabs">
+    <div class="sidebar-brand">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14"/><path d="M9 9h1m4 0h1m-6 4h1m4 0h1m-6 4h1m4 0h1"/></svg>
+      <span id="sidebar-empresa-nome">CD · WMS+</span>
+    </div>
+    <div class="bt-item" id="bt-ciclo" data-target="view-turno">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <span>Ciclo</span>
+    </div>
+    <div class="bt-item" id="bt-painel" data-target="view-painel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg>
+      <span>Painel</span>
+    </div>
+  </nav>
+
+  <div class="shell-scroll" id="shell-scroll">
+  <div class="statusbar"><span class="mono">9:41</span><span class="mono">CD · WMS+</span></div>
+
+  <!-- ======================= VIEW: LOGIN ======================= -->
+  <div class="view active" id="view-login">
+    <div class="head">
+      <p class="eyebrow">Ciclo do turno</p>
+      <h1 class="app-title">Quem está operando?</h1>
+      <p class="app-sub">Selecione seu perfil para iniciar</p>
+      <div class="lock-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+    </div>
+
+    <div class="operator-grid" id="operator-grid"></div>
+
+    <div class="add-op-btn" id="btn-goto-cadastro">+ Cadastrar novo operador</div>
+
+    <div class="company-chip" id="btn-goto-empresa">
+      <div class="cc-left">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1m4 0h1m-6 4h1m4 0h1m-6 4h1m4 0h1"/></svg>
+        <div class="cc-text" id="company-chip-text">
+          <div class="cc-name">Nenhuma empresa configurada</div>
+        </div>
+      </div>
+      <div class="cc-edit" id="company-chip-action">Configurar</div>
+    </div>
+
+    <div class="pin-panel hidden" id="login-pin-panel">
+      <p class="pin-who" id="login-pin-who">—</p>
+      <p class="pin-hint">Digite seu PIN de 4 dígitos · demo: <span class="mono">1234</span></p>
+      <div class="pin-dots" id="login-pin-dots"></div>
+      <div class="keypad" id="login-keypad"></div>
+    </div>
+  </div>
+
+  <!-- ======================= VIEW: EMPRESA ======================= -->
+  <div class="view" id="view-empresa">
+    <div class="head">
+      <div class="back-link" id="btn-back-login-2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+        Voltar
+      </div>
+      <p class="eyebrow">Configuração</p>
+      <h1 class="app-title">Dados da empresa</h1>
+      <p class="app-sub">Usado no cabeçalho do sistema e nos resumos gerados</p>
+    </div>
+
+    <div class="form-group" style="margin-top:20px;">
+      <label class="form-label">Razão social / Nome</label>
+      <input class="form-input" id="emp-nome" placeholder="Ex: Distribuidora Vale do Sertão Ltda" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">CNPJ</label>
+      <input class="form-input mono" id="emp-cnpj" placeholder="00.000.000/0000-00" maxlength="18" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Segmento de atuação</label>
+      <input class="form-input" id="emp-segmento" placeholder="Ex: Distribuição de bebidas" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Unidade / CD</label>
+      <input class="form-input" id="emp-unidade" placeholder="Ex: CD Feira de Santana" />
+    </div>
+
+    <button class="primary-btn" id="btn-salvar-empresa" disabled>Salvar dados da empresa</button>
+  </div>
+
+  <!-- ======================= VIEW: CADASTRO ======================= -->
+  <div class="view" id="view-cadastro">
+    <div class="head">
+      <div class="back-link" id="btn-back-login">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+        Voltar
+      </div>
+      <p class="eyebrow">Novo operador</p>
+      <h1 class="app-title">Cadastrar operador</h1>
+      <p class="app-sub">Esses dados aparecem em todo o histórico do ciclo</p>
+    </div>
+
+    <div class="avatar-upload" id="cad-avatar-upload">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>
+      <input type="file" id="cad-avatar-input" accept="image/*" hidden>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Nome completo</label>
+      <input class="form-input" id="cad-nome" placeholder="Ex: Beatriz Andrade" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Matrícula</label>
+      <input class="form-input mono" id="cad-matricula" placeholder="0000" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Função</label>
+      <div class="segmented">
+        <div class="seg-opt active" data-papel="Operador CD">Operador CD</div>
+        <div class="seg-opt" data-papel="Motorista">Motorista</div>
+      </div>
+    </div>
+
+    <button class="primary-btn" id="btn-cadastrar" disabled>Cadastrar e criar PIN</button>
+
+    <div class="pin-panel hidden" id="cad-pin-panel">
+      <p class="pin-who">Crie um PIN de acesso</p>
+      <p class="pin-hint">Você vai usar isso pra entrar no turno</p>
+      <div class="pin-dots" id="cad-pin-dots"></div>
+      <div class="keypad" id="cad-keypad"></div>
+    </div>
+  </div>
+
+  <!-- ======================= VIEW: CARGA (cadastro pela nota) ======================= -->
+  <div class="view" id="view-carga-form">
+    <div class="head">
+      <div class="back-link" id="btn-back-turno-carga">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+        Voltar
+      </div>
+      <p class="eyebrow">NF de entrada</p>
+      <h1 class="app-title">Cadastrar carga</h1>
+      <p class="app-sub">Registro do que chegou — a nota de saída é lançada depois, na Separação</p>
+    </div>
+
+    <div class="form-group" style="margin-top:20px;">
+      <label class="form-label">Número da NF de entrada</label>
+      <input class="form-input mono" id="carga-nf-input" placeholder="Ex: 44821" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Fornecedor</label>
+      <input class="form-input" id="carga-fornecedor-input" placeholder="Ex: Fábrica Petrópolis" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Produtos da nota</label>
+      <div id="produtos-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+      <div class="add-op-btn" id="btn-add-produto" style="margin-top:8px; padding:9px;">+ Adicionar produto</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Foto da NF ou da carga <span style="color:var(--alert);">*</span></label>
+      <div class="attach-row" style="margin-top:0;">
+        <label class="attach-btn" style="width:100%; justify-content:center; padding:11px;">
+          📎 Anexar foto (obrigatório)
+          <input type="file" multiple accept="image/*" hidden id="carga-foto-input">
+        </label>
+      </div>
+      <div class="attach-chips" id="carga-foto-chips"></div>
+    </div>
+
+    <button class="primary-btn" id="btn-salvar-carga">Salvar carga</button>
+  </div>
+
+  <!-- ======================= VIEW: NOTA DE SAÍDA ======================= -->
+  <div class="view" id="view-nfsaida-form">
+    <div class="head">
+      <div class="back-link" id="btn-back-turno-nfsaida">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+        Voltar
+      </div>
+      <p class="eyebrow">Etapa: Separação</p>
+      <h1 class="app-title">Lançar nota de saída</h1>
+      <p class="app-sub">O documento que vai acompanhar a carga até o cliente</p>
+    </div>
+
+    <div class="form-group" style="margin-top:20px;">
+      <label class="form-label">Número da NF de saída</label>
+      <input class="form-input mono" id="nfsaida-numero-input" placeholder="Ex: 78341" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Cliente / Destinatário</label>
+      <input class="form-input" id="nfsaida-cliente-input" placeholder="Ex: Distribuidora Nordeste Ltda" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Endereço de entrega</label>
+      <input class="form-input" id="nfsaida-endereco-input" placeholder="Ex: Av. Getúlio Vargas, 1200 — Feira de Santana/BA" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Produtos da nota de saída</label>
+      <div id="produtos-saida-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+      <div class="add-op-btn" id="btn-add-produto-saida" style="margin-top:8px; padding:9px;">+ Adicionar produto</div>
+    </div>
+
+    <button class="primary-btn" id="btn-salvar-nfsaida">Salvar nota de saída</button>
+  </div>
+
+  <!-- ======================= VIEW: VIAGEM (DT) ======================= -->
+  <div class="view" id="view-motorista-form">
+    <div class="head">
+      <div class="back-link" id="btn-back-turno-motorista">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+        Voltar
+      </div>
+      <p class="eyebrow">Etapa: Transporte / Rota</p>
+      <h1 class="app-title">Atribuir à viagem</h1>
+      <p class="app-sub">Um motorista pode levar várias notas na mesma viagem — busque pelo DT</p>
+    </div>
+
+    <div class="carga-section" style="padding-top:16px;">
+      <p class="section-label">Viagens em aberto</p>
+      <div id="viagens-abertas-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+
+    <div class="carga-section" style="padding-top:6px;">
+      <div class="add-op-btn" id="btn-nova-viagem" style="margin:0;">+ Criar nova viagem</div>
+    </div>
+
+    <div id="nova-viagem-form" style="display:none;">
+      <div class="form-group" style="margin-top:6px;">
+        <label class="form-label">Número do DT (documento de transporte)</label>
+        <input class="form-input mono" id="dt-numero-input" placeholder="Ex: DT-2201" />
+      </div>
+      <div id="motoristas-quick-list" style="padding:0 24px 4px; display:flex; flex-wrap:wrap; gap:6px;"></div>
+      <div class="form-group">
+        <label class="form-label">Nome do motorista</label>
+        <input class="form-input" id="mot-nome-input" placeholder="Ex: Jorge Lima" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Matrícula</label>
+        <input class="form-input mono" id="mot-matricula-input" placeholder="Ex: 0456" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Placa do caminhão</label>
+        <input class="form-input mono" id="mot-placa-input" placeholder="Ex: ABC-1D23" style="text-transform:uppercase;" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Foto da CNH</label>
+        <div class="avatar-upload" id="mot-cnh-upload" style="border-radius:12px; width:100%; height:120px;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>
+          <input type="file" id="mot-cnh-input" accept="image/*" hidden>
+        </div>
+      </div>
+      <button class="primary-btn" id="btn-salvar-motorista">Criar viagem e vincular nota</button>
+    </div>
+  </div>
+
+  <!-- ======================= VIEW: ENCERRAR TURNO ======================= -->
+  <div class="view" id="view-encerrar">
+    <div class="head">
+      <div class="back-link" id="btn-back-turno-encerrar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+        Cancelar
+      </div>
+      <p class="eyebrow">Fechar turno</p>
+      <h1 class="app-title">Encerrar turno</h1>
+      <p class="app-sub">Isso gera o resumo pra quem assumir depois de você</p>
+    </div>
+
+    <div id="encerrar-summary-box"></div>
+
+    <div id="encerrar-pendencias-list"></div>
+
+    <div class="form-group" style="margin-top:6px;">
+      <label class="form-label">Observação geral do turno (opcional)</label>
+      <textarea class="form-input" id="encerrar-obs" style="min-height:70px; resize:vertical; font-family:inherit;" placeholder="Algo importante que a próxima pessoa precisa saber..."></textarea>
+    </div>
+
+    <button class="primary-btn" id="btn-confirmar-encerrar">Confirmar encerramento</button>
+  </div>
+
+  <!-- ======================= VIEW: TURNO ======================= -->
+  <div class="view" id="view-turno">
+    <header class="app-head">
+      <p class="eyebrow">Ciclo do turno</p>
+      <h1 class="app-title">Centro de Distribuição</h1>
+      <p class="app-sub" id="turno-app-sub">Feira de Santana · Turno Manhã</p>
+
+      <div class="you-row">
+        <div class="you-id">
+          <div class="avatar" id="you-avatar">AF</div>
+          <div>
+            <div class="you-name" id="you-name">Ana Ferreira</div>
+            <div class="you-mat mono" id="you-mat">Matrícula 0231</div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="turno-code"><div>Turno <b class="mono" id="turno-codigo">#0417</b></div><div class="mono" id="turno-horario">06:00 – 14:00</div></div>
+          <div class="logout-link" id="btn-logout" style="margin-top:6px;">Sair →</div>
+        </div>
+      </div>
+    </header>
+
+    <div class="encerrar-btn" id="btn-encerrar-turno">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+      Encerrar meu turno
+    </div>
+
+    <div class="tabnav">
+      <div class="tabbtn" onclick="document.getElementById('carga-anchor').scrollIntoView({behavior:'smooth',block:'start'})">
+        <svg class="tabbtn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h-1a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h1M8 3h1a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8M3 9h2M3 15h2M19 9h2M19 15h2"/></svg>
+        <div class="tabbtn-label">Carga</div>
+        <div class="tabbtn-value" id="tab-carga-value">—</div>
+      </div>
+      <div class="tabbtn" onclick="document.getElementById('cd-anchor').scrollIntoView({behavior:'smooth',block:'start'})">
+        <svg class="tabbtn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14"/><path d="M9 9h1m4 0h1m-6 4h1m4 0h1m-6 4h1m4 0h1"/></svg>
+        <div class="tabbtn-label">No CD</div>
+        <div class="tabbtn-value" id="tab-cd-value">—</div>
+      </div>
+      <div class="tabbtn" onclick="document.getElementById('rota-anchor').scrollIntoView({behavior:'smooth',block:'start'})">
+        <svg class="tabbtn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M14 9h4l4 4v4a1 1 0 0 1-1 1h-2"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+        <div class="tabbtn-label">Rota</div>
+        <div class="tabbtn-value" id="tab-rota-value">—</div>
+      </div>
+    </div>
+
+    <div class="banner" id="handoff-banner">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
+      <div>
+        <p class="banner-title">Pendência do turno anterior</p>
+        <p class="banner-body" id="banner-body-text">—</p>
+      </div>
+    </div>
+
+    <div class="carga-section" id="carga-anchor">
+      <p class="section-label">
+        <span id="trocar-carga-btn" class="edit-carga-btn" style="margin-right:6px;">⇄ Trocar carga</span>
+        Carga ativa <span class="edit-carga-btn" id="btn-edit-carga">✎ Editar</span>
+      </p>
+      <div class="carga-card">
+        <div class="carga-top">
+          <div>
+            <div class="carga-id">Carga <b class="mono" id="carga-id-display">CG-1842</b></div>
+            <p class="carga-cliente" id="carga-cliente-display">NF de saída ainda não lançada</p>
+            <p class="carga-endereco" id="carga-endereco-display">—</p>
+          </div>
+          <div class="carga-meta"><div><b id="carga-itens-display">18</b> itens</div><div>NF entrada <b class="mono" id="carga-nf-display">44821</b></div></div>
+        </div>
+        <div class="carga-meta" id="carga-nfsaida-meta" style="text-align:left; margin:-4px 0 10px; font-size:10.5px;"></div>
+        <div class="status-row" id="carga-status-row">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M14 9h4l4 4v4a1 1 0 0 1-1 1h-2"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+          <div class="status-row-text" id="carga-status-text">—</div>
+        </div>
+        <div class="stepper">
+          <div class="stepper-line-wrap"><div class="stepper-line-bg"></div><div class="stepper-line-fill" id="stepper-line-fill" style="width:0%"></div></div>
+          <div class="stepper-nodes" id="stepper-nodes"></div>
+          <div class="stepper-caption"><span>Recebimento</span><span class="current-label" id="stepper-current-label">—</span><span>Retorno</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="area" id="cd-anchor"><p class="section-label">No centro de distribuição</p><ol class="timeline" id="timeline-cd"></ol></div>
+    <div class="area" id="rota-anchor" style="padding-top:6px;"><p class="section-label">Na rota</p><ol class="timeline" id="timeline-rota"></ol></div>
+
+    <p class="foot-note">Toque numa etapa para registrar status, observação e anexos.<br>A linha tracejada marca onde a carga muda de mãos.</p>
+  </div>
+
+  <!-- ======================= VIEW: SELEÇÃO DE CARGA ======================= -->
+  <div class="view" id="view-cargas">
+    <div class="head">
+      <div class="back-link" id="btn-back-turno-cargas">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+        Voltar
+      </div>
+      <p class="eyebrow">Cargas</p>
+      <h1 class="app-title">Qual carga você vai operar?</h1>
+      <p class="app-sub">Selecionar assume a próxima etapa em aberto como sua responsabilidade</p>
+    </div>
+
+    <div class="add-op-btn" id="btn-nova-carga" style="margin-top:16px;">+ Nova carga (dar baixa na NF)</div>
+
+    <div id="cargas-list" style="padding:16px 22px 4px; display:flex; flex-direction:column; gap:10px;"></div>
+
+    <div class="logout-link" id="btn-logout-2" style="text-align:center; margin:18px 0 8px;">Sair →</div>
+  </div>
+
+  <!-- ======================= VIEW: PAINEL ======================= -->
+  <div class="view" id="view-painel">
+    <div class="head">
+      <div class="back-link" id="btn-back-turno-painel">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+        Voltar pro turno
+      </div>
+      <p class="eyebrow">Painel de acompanhamento</p>
+      <h1 class="app-title" id="painel-titulo-carga">Carga CG-1842</h1>
+      <p class="app-sub">Progresso, colaboradores e histórico completo do processo</p>
+    </div>
+
+    <div class="carga-section" style="padding-top:16px;">
+      <div class="kpi-grid" id="kpi-grid"></div>
+      <div class="painel-card" style="margin-top:10px;">
+        <div class="painel-bar-wrap" id="painel-bar-wrap"></div>
+        <p class="painel-list-label">Etapas</p>
+        <div id="painel-list"></div>
+      </div>
+    </div>
+
+    <div class="carga-section" style="padding-top:6px;">
+      <p class="section-label">Colaboradores envolvidos</p>
+      <div class="painel-card" id="colaboradores-card"></div>
+    </div>
+
+    <div class="carga-section" style="padding-top:6px; padding-bottom:26px;">
+      <p class="section-label">Linha do tempo da carga</p>
+      <div class="painel-card" id="timeline-eventos-card"></div>
+    </div>
+  </div>
+
+  </div>
+
+</div>
+
+<datalist id="origens-datalist"></datalist>
+<datalist id="destinos-datalist"></datalist>
+
+<script>
+/* ---------------- state ---------------- */
+let empresa = { nome:'', cnpj:'', segmento:'', unidade:'' };
+
+function makeStagesCD(){
+  return [
+    { id:'recebimento', nome:'Recebimento', role:'Operador CD', icon:'recebimento', status:'pending', operador:null, obs:'', handoff:false, options:['done','progress','pending'], attachments:[], atualizadoEm:null },
+    { id:'conferencia', nome:'Conferência de qualidade', role:'Operador CD', icon:'conferencia', status:'pending', operador:null, obs:'', handoff:false, options:['done','progress','pending'], attachments:[], atualizadoEm:null },
+    { id:'origemdestino', nome:'Origem e Destino', role:'Operador CD', icon:'origemdestino', status:'pending', operador:null, obs:'', handoff:true, options:['done','progress','pending'], attachments:[], atualizadoEm:null, origem:'', destino:'' },
+    { id:'separacao', nome:'Separação', role:'Operador CD', icon:'separacao', status:'pending', operador:null, obs:'', handoff:false, options:['done','progress','pending','alert'], attachments:[], atualizadoEm:null },
+    { id:'expedicao', nome:'Expedição / Carregamento', role:'Operador CD', icon:'expedicao', status:'pending', operador:null, obs:'', handoff:true, options:['done','progress','pending'], attachments:[], atualizadoEm:null },
+  ];
+}
+function makeStagesRota(){
+  return [
+    { id:'transporte', nome:'Transporte / Rota', role:'Motorista', icon:'transporte', status:'pending', operador:null, obs:'', handoff:true, options:['done','progress','pending','alert'], attachments:[], atualizadoEm:null },
+    { id:'entrega', nome:'Entrega final (confirmação)', role:'Motorista', icon:'entrega', status:'pending', operador:null, obs:'', handoff:false, special:true, options:['done','alert-ausente','alert-recusado','alert-avariado'], attachments:[], atualizadoEm:null },
+    { id:'retorno', nome:'Retorno / Ocorrência pós-entrega', role:'Motorista', icon:'retorno', status:'pending', operador:null, obs:'', handoff:false, options:['done','progress','pending'], attachments:[], atualizadoEm:null },
+  ];
+}
+
+let cargas = [
+  {
+    id: 'CG-1842', nf: '44821', fornecedor: 'Fábrica Petrópolis',
+    itens: 18, nfSaida: null,
+    criadoEm: new Date().toISOString(),
+    criadoPor: { nome:'Ana Ferreira', mat:'0231' },
+    produtos: [
+      { nome:'Cerveja Petrópolis Lager 350ml (fardo 24un)', quantidade: 10 },
+      { nome:'Refrigerante Itubaína 2L (fardo 6un)', quantidade: 8 },
+    ],
+    stagesCD: [
+      { id:'recebimento', nome:'Recebimento', role:'Operador CD', icon:'recebimento', status:'done',
+        operador:{nome:'Ana Ferreira', mat:'0231'}, obs:'48 caixas do fornecedor Vitalle, 3 avariadas — registradas à parte.',
+        handoff:false, options:['done','progress','pending'],
+        attachments:[], atualizadoEm:new Date(Date.now()-3*3600e3).toISOString() },
+      { id:'conferencia', nome:'Conferência de qualidade', role:'Operador CD', icon:'conferencia', status:'done',
+        operador:{nome:'Ana Ferreira', mat:'0231'}, obs:'Lote 22B aprovado. Avarias fotografadas e separadas para devolução.',
+        handoff:false, options:['done','progress','pending'], attachments:[], atualizadoEm:new Date(Date.now()-2.6*3600e3).toISOString() },
+      { id:'origemdestino', nome:'Origem e Destino', role:'Operador CD', icon:'origemdestino', status:'done',
+        operador:{nome:'Carlos Souza', mat:'0198'}, obs:'', origem:'Fábrica Petrópolis — Alagoinhas/BA', destino:'CD Feira de Santana',
+        handoff:true, options:['done','progress','pending'], attachments:[], atualizadoEm:new Date(Date.now()-2*3600e3).toISOString() },
+      { id:'separacao', nome:'Separação', role:'Operador CD', icon:'separacao', status:'alert',
+        operador:{nome:'Carlos Souza', mat:'0198'}, obs:'12 de 18 pedidos conferidos. Falta lote 22B do pedido #5521.',
+        handoff:false, options:['done','progress','pending','alert'], attachments:[], atualizadoEm:new Date(Date.now()-1*3600e3).toISOString() },
+      { id:'expedicao', nome:'Expedição / Carregamento', role:'Operador CD', icon:'expedicao', status:'pending',
+        operador:null, obs:'', handoff:true, options:['done','progress','pending'], attachments:[], atualizadoEm:null },
+    ],
+    stagesRota: [
+      { id:'transporte', nome:'Transporte / Rota', role:'Motorista', icon:'transporte', status:'pending',
+        operador:{nome:'Jorge Lima', mat:'0456'}, obs:'',
+        handoff:true, options:['done','progress','pending','alert'], attachments:[], atualizadoEm:null },
+      { id:'entrega', nome:'Entrega final (confirmação)', role:'Motorista', icon:'entrega', status:'pending',
+        operador:{nome:'Jorge Lima', mat:'0456'}, obs:'', handoff:false, special:true,
+        options:['done','alert-ausente','alert-recusado','alert-avariado'], attachments:[], atualizadoEm:null },
+      { id:'retorno', nome:'Retorno / Ocorrência pós-entrega', role:'Motorista', icon:'retorno', status:'pending',
+        operador:{nome:'Jorge Lima', mat:'0456'}, obs:'', handoff:false,
+        options:['done','progress','pending'], attachments:[], atualizadoEm:null },
+    ],
+  }
+];
+let cargaAtivaId = cargas[0].id;
+function getCarga(id){ return cargas.find(c => c.id === (id || cargaAtivaId)); }
+
+let viagens = []; // { id (DT), motorista:{nome,matricula,placa,cnhFoto}, notasIds:[], criadoEm }
+function getViagem(id){ return viagens.find(v => v.id === id); }
+
+let turnosFechados = []; // { operadorNome, matricula, encerradoEm, horaFormatada, pendencias:[{id,nome}], obsGeral }
+
+const hasStorage = (typeof window !== 'undefined' && !!window.storage);
+const STORAGE_KEY = 'turno-app-state-v3';
+
+async function saveState(){
+  if(!hasStorage) return;
+  try{
+    const payload = JSON.stringify({ empresa, operators, cargas, cargaAtivaId, viagens, turnosFechados });
+    await window.storage.set(STORAGE_KEY, payload, true);
+  } catch(e){ console.warn('Não foi possível salvar o estado:', e); }
+}
+
+async function loadState(){
+  if(!hasStorage) return;
+  try{
+    const result = await window.storage.get(STORAGE_KEY, true);
+    if(result && result.value){
+      const data = JSON.parse(result.value);
+      if(data.empresa) Object.assign(empresa, data.empresa);
+      if(data.operators && data.operators.length){ operators.length = 0; operators.push(...data.operators); }
+      if(data.cargas && data.cargas.length){ cargas.length = 0; cargas.push(...data.cargas); }
+      if(data.cargaAtivaId) cargaAtivaId = data.cargaAtivaId;
+      if(data.viagens){ viagens.length = 0; viagens.push(...data.viagens); }
+      if(data.turnosFechados){ turnosFechados.length = 0; turnosFechados.push(...data.turnosFechados); }
+    }
+  } catch(e){ /* nenhum estado salvo ainda — segue com os valores padrão */ }
+}
+
+let operators = [
+  { nome:'Ana Ferreira', matricula:'0231', papel:'Operador CD', pin:'1234', foto:null },
+  { nome:'Carlos Souza', matricula:'0198', papel:'Operador CD', pin:'1234', foto:null },
+  { nome:'Jorge Lima',   matricula:'0456', papel:'Motorista',   pin:'1234', foto:null },
+];
+let currentOperator = null;
+let pendingLoginOp = null;
+let cadNewOperator = null;
+
+function initials(nome){ return nome.split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase(); }
+
+const TABBED_VIEWS = ['view-turno', 'view-painel'];
+function showView(id){
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('shell-scroll').scrollTo({top:0});
+
+  const tabsEl = document.getElementById('bottom-tabs');
+  tabsEl.classList.toggle('show', TABBED_VIEWS.includes(id));
+  document.querySelectorAll('.bt-item').forEach(b => b.classList.toggle('active', b.dataset.target === id));
+}
+
+document.getElementById('bt-ciclo').addEventListener('click', () => showView('view-turno'));
+document.getElementById('bt-painel').addEventListener('click', () => abrirPainel());
+
+/* ---------------- LOGIN VIEW ---------------- */
+function renderOperatorGrid(){
+  const grid = document.getElementById('operator-grid');
+  grid.innerHTML = '';
+  operators.forEach(op => {
+    const card = document.createElement('div');
+    card.className = 'op-card';
+    card.innerHTML = `
+      <div class="op-avatar">${op.foto ? `<img src="${op.foto}">` : initials(op.nome)}</div>
+      <div class="op-name">${op.nome}</div>
+      <div class="op-role">${op.papel}</div>
+      <div class="op-mat mono">mat. ${op.matricula}</div>
+    `;
+    card.addEventListener('click', () => selectLoginOperator(op, card));
+    grid.appendChild(card);
+  });
+}
+
+function buildKeypad(container, onDigit){
+  container.innerHTML = '';
+  const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+  keys.forEach(k => {
+    const el = document.createElement('div');
+    el.className = 'key' + (k === '' ? ' ghost' : '');
+    el.textContent = k;
+    if(k !== ''){
+      el.addEventListener('click', () => onDigit(k));
+    }
+    container.appendChild(el);
+  });
+}
+
+let loginPin = '';
+function selectLoginOperator(op, cardEl){
+  document.querySelectorAll('#operator-grid .op-card').forEach(c => c.classList.remove('selected'));
+  cardEl.classList.add('selected');
+  pendingLoginOp = op;
+  loginPin = '';
+  document.getElementById('login-pin-who').textContent = `Bem-vindo(a), ${op.nome.split(' ')[0]}`;
+  document.getElementById('login-pin-panel').classList.remove('hidden');
+  renderPinDots('login-pin-dots', 0);
+  buildKeypad(document.getElementById('login-keypad'), (k) => {
+    if(k === '⌫'){ loginPin = loginPin.slice(0,-1); }
+    else if(loginPin.length < 4){ loginPin += k; }
+    renderPinDots('login-pin-dots', loginPin.length);
+    if(loginPin.length === 4){
+      setTimeout(() => {
+        currentOperator = pendingLoginOp;
+        enterTurno();
+      }, 180);
+    }
+  });
+  document.getElementById('login-pin-panel').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function renderPinDots(containerId, filledCount){
+  const c = document.getElementById(containerId);
+  c.innerHTML = '';
+  for(let i=0;i<4;i++){
+    const d = document.createElement('div');
+    d.className = 'pin-dot' + (i < filledCount ? ' filled' : '');
+    c.appendChild(d);
+  }
+}
+
+document.getElementById('btn-goto-cadastro').addEventListener('click', () => {
+  resetCadastroForm();
+  showView('view-cadastro');
+});
+document.getElementById('btn-back-login').addEventListener('click', () => showView('view-login'));
+document.getElementById('btn-back-login-2').addEventListener('click', () => showView('view-login'));
+
+let isFirstRun = false;
+
+document.getElementById('btn-goto-empresa').addEventListener('click', () => {
+  document.getElementById('emp-nome').value = empresa.nome;
+  document.getElementById('emp-cnpj').value = empresa.cnpj;
+  document.getElementById('emp-segmento').value = empresa.segmento || '';
+  document.getElementById('emp-unidade').value = empresa.unidade;
+  document.getElementById('btn-back-login-2').style.display = '';
+  document.getElementById('btn-salvar-empresa').textContent = 'Salvar dados da empresa';
+  validateEmpresaForm();
+  showView('view-empresa');
+});
+
+function maskCNPJ(value){
+  let v = value.replace(/\D/g,'').slice(0,14);
+  v = v.replace(/^(\d{2})(\d)/, '$1.$2');
+  v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+  v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
+  v = v.replace(/(\d{4})(\d)/, '$1-$2');
+  return v;
+}
+document.getElementById('emp-cnpj').addEventListener('input', (e) => {
+  e.target.value = maskCNPJ(e.target.value);
+  validateEmpresaForm();
+});
+document.getElementById('emp-nome').addEventListener('input', validateEmpresaForm);
+
+function validateEmpresaForm(){
+  const nomeOk = document.getElementById('emp-nome').value.trim().length > 2;
+  const cnpjOk = document.getElementById('emp-cnpj').value.replace(/\D/g,'').length === 14;
+  document.getElementById('btn-salvar-empresa').disabled = !(nomeOk && cnpjOk);
+}
+
+function renderCompanyChip(){
+  const chipTextEl = document.getElementById('company-chip-text');
+  const actionEl = document.getElementById('company-chip-action');
+  if(empresa.nome){
+    chipTextEl.innerHTML = `<div class="cc-name">${escapeHtml(empresa.nome)}</div><div class="cc-cnpj mono">${empresa.cnpj}</div>`;
+    actionEl.textContent = 'Editar';
+  } else {
+    chipTextEl.innerHTML = `<div class="cc-name">Nenhuma empresa configurada</div>`;
+    actionEl.textContent = 'Configurar';
+  }
+}
+
+document.getElementById('btn-salvar-empresa').addEventListener('click', () => {
+  empresa.nome = document.getElementById('emp-nome').value.trim();
+  empresa.cnpj = document.getElementById('emp-cnpj').value.trim();
+  empresa.segmento = document.getElementById('emp-segmento').value.trim();
+  empresa.unidade = document.getElementById('emp-unidade').value.trim();
+  renderCompanyChip();
+  updateTurnoHeaderCompany();
+  saveState();
+  if(isFirstRun){
+    resetCadastroForm();
+    showView('view-cadastro');
+  } else {
+    showView('view-login');
+  }
+});
+
+function updateTurnoHeaderCompany(){
+  const sub = document.getElementById('turno-app-sub');
+  if(empresa.nome){
+    sub.textContent = `${empresa.nome}${empresa.unidade ? ' · ' + empresa.unidade : ''}`;
+    document.getElementById('sidebar-empresa-nome').textContent = empresa.unidade || empresa.nome;
+  }
+}
+
+document.getElementById('btn-logout').addEventListener('click', () => {
+  currentOperator = null;
+  document.getElementById('login-pin-panel').classList.add('hidden');
+  document.querySelectorAll('#operator-grid .op-card').forEach(c => c.classList.remove('selected'));
+  showView('view-login');
+});
+
+/* ---------------- CARGA / NF DE ENTRADA (Recebimento) ---------------- */
+let cargaFormMode = 'edit'; // 'edit' | 'create'
+let produtosFormState = [];
+let cargaFotoAttachments = [];
+
+function renderProdutosForm(){
+  const listEl = document.getElementById('produtos-list');
+  listEl.innerHTML = '';
+  produtosFormState.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'produto-row';
+    row.innerHTML = `
+      <input class="form-input prod-nome" placeholder="Nome do produto" value="${escapeHtml(p.nome)}" data-field="nome" />
+      <input class="form-input mono prod-qtd" type="number" min="1" placeholder="Qtd" value="${p.quantidade}" data-field="quantidade" />
+      <span class="prod-rm">×</span>
+    `;
+    row.querySelector('[data-field="nome"]').addEventListener('input', (e) => { produtosFormState[i].nome = e.target.value; });
+    row.querySelector('[data-field="quantidade"]').addEventListener('input', (e) => { produtosFormState[i].quantidade = parseInt(e.target.value,10) || 0; });
+    row.querySelector('.prod-rm').addEventListener('click', () => { produtosFormState.splice(i,1); renderProdutosForm(); });
+    listEl.appendChild(row);
+  });
+}
+document.getElementById('btn-add-produto').addEventListener('click', () => {
+  produtosFormState.push({ nome:'', quantidade:1 });
+  renderProdutosForm();
+});
+
+function renderCargaFotoChips(){
+  const chipsEl = document.getElementById('carga-foto-chips');
+  chipsEl.innerHTML = '';
+  cargaFotoAttachments.forEach((att, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'attach-chip';
+    chip.innerHTML = `<img class="thumb" src="${att.url}"><span class="fname">${escapeHtml(att.name)}</span><span class="rm" data-rm="${i}">×</span>`;
+    chip.querySelector('.rm').addEventListener('click', () => { cargaFotoAttachments.splice(i,1); renderCargaFotoChips(); });
+    chipsEl.appendChild(chip);
+  });
+}
+document.getElementById('carga-foto-input').addEventListener('change', (e) => {
+  const files = Array.from(e.target.files);
+  Promise.all(files.map(file => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({ name:file.name, url:reader.result, isImage:true });
+    reader.readAsDataURL(file);
+  }))).then(newAtts => {
+    cargaFotoAttachments.push(...newAtts);
+    renderCargaFotoChips();
+  });
+  e.target.value = '';
+});
+
+document.getElementById('btn-edit-carga').addEventListener('click', () => {
+  const carga = getCarga();
+  cargaFormMode = 'edit';
+  document.getElementById('carga-nf-input').value = carga.nf;
+  document.getElementById('carga-fornecedor-input').value = carga.fornecedor || '';
+  produtosFormState = (carga.produtos && carga.produtos.length)
+    ? carga.produtos.map(p => ({...p}))
+    : [{ nome:'Itens diversos', quantidade: carga.itens || 1 }];
+  renderProdutosForm();
+  cargaFotoAttachments = [];
+  renderCargaFotoChips();
+  document.querySelector('#view-carga-form .app-title').textContent = 'Editar carga';
+  document.getElementById('btn-salvar-carga').textContent = 'Salvar alterações';
+  document.getElementById('btn-back-turno-carga').dataset.target = 'view-turno';
+  showView('view-carga-form');
+});
+
+document.getElementById('btn-nova-carga').addEventListener('click', () => {
+  cargaFormMode = 'create';
+  document.getElementById('carga-nf-input').value = '';
+  document.getElementById('carga-fornecedor-input').value = '';
+  produtosFormState = [{ nome:'', quantidade:1 }];
+  renderProdutosForm();
+  cargaFotoAttachments = [];
+  renderCargaFotoChips();
+  document.querySelector('#view-carga-form .app-title').textContent = 'Cadastrar carga';
+  document.getElementById('btn-salvar-carga').textContent = 'Registrar recebimento';
+  document.getElementById('btn-back-turno-carga').dataset.target = 'view-cargas';
+  showView('view-carga-form');
+});
+
+document.getElementById('btn-back-turno-carga').addEventListener('click', (e) => {
+  showView(e.currentTarget.dataset.target || 'view-turno');
+});
+
+document.getElementById('btn-salvar-carga').addEventListener('click', () => {
+  const nf = document.getElementById('carga-nf-input').value.trim();
+  const fornecedor = document.getElementById('carga-fornecedor-input').value.trim();
+  const produtos = produtosFormState.filter(p => p.nome.trim().length > 0 && p.quantidade > 0);
+  const totalItens = produtos.reduce((sum,p) => sum + p.quantidade, 0);
+
+  if(cargaFormMode === 'create'){
+    if(cargaFotoAttachments.length === 0){
+      alert('Anexe pelo menos uma foto da NF ou da carga antes de registrar o recebimento.');
+      return;
+    }
+    const novaCarga = {
+      id: 'CG-' + Math.floor(1000 + Math.random()*9000),
+      nf: nf || '—', fornecedor: fornecedor || 'Não informado',
+      itens: totalItens, produtos, nfSaida: null,
+      criadoEm: new Date().toISOString(),
+      criadoPor: currentOperator ? { nome:currentOperator.nome, mat:currentOperator.matricula } : null,
+      stagesCD: makeStagesCD(),
+      stagesRota: makeStagesRota(),
+    };
+    // Registrar a carga é o próprio ato de Recebimento — dar baixa na NF já conclui essa etapa.
+    const receb = findStageInCarga(novaCarga, 'recebimento');
+    receb.status = 'done';
+    receb.operador = currentOperator ? { nome:currentOperator.nome, mat:currentOperator.matricula } : null;
+    receb.obs = `NF de entrada ${nf || 's/n'} — fornecedor ${fornecedor || 'não informado'} — ${produtos.length} produto(s), ${totalItens} itens.`;
+    receb.attachments = cargaFotoAttachments.map(a => ({...a}));
+    receb.atualizadoEm = new Date().toISOString();
+
+    cargas.push(novaCarga);
+    cargaAtivaId = novaCarga.id;
+    renderCargaCycle();
+    saveState();
+    showView('view-turno');
+    document.getElementById('carga-anchor').scrollIntoView({behavior:'smooth', block:'start'});
+  } else {
+    const carga = getCarga();
+    carga.nf = nf || carga.nf;
+    carga.fornecedor = fornecedor || carga.fornecedor;
+    carga.produtos = produtos;
+    carga.itens = totalItens || carga.itens;
+    renderCargaCard();
+    refreshAll();
+    showView('view-turno');
+    document.getElementById('carga-anchor').scrollIntoView({behavior:'smooth', block:'start'});
+  }
+});
+
+/* ---------------- NOTA DE SAÍDA (Separação) ---------------- */
+let produtosSaidaFormState = [];
+
+function renderProdutosSaidaForm(){
+  const listEl = document.getElementById('produtos-saida-list');
+  listEl.innerHTML = '';
+  produtosSaidaFormState.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'produto-row';
+    row.innerHTML = `
+      <input class="form-input prod-nome" placeholder="Nome do produto" value="${escapeHtml(p.nome)}" data-field="nome" />
+      <input class="form-input mono prod-qtd" type="number" min="1" placeholder="Qtd" value="${p.quantidade}" data-field="quantidade" />
+      <span class="prod-rm">×</span>
+    `;
+    row.querySelector('[data-field="nome"]').addEventListener('input', (e) => { produtosSaidaFormState[i].nome = e.target.value; });
+    row.querySelector('[data-field="quantidade"]').addEventListener('input', (e) => { produtosSaidaFormState[i].quantidade = parseInt(e.target.value,10) || 0; });
+    row.querySelector('.prod-rm').addEventListener('click', () => { produtosSaidaFormState.splice(i,1); renderProdutosSaidaForm(); });
+    listEl.appendChild(row);
+  });
+}
+document.getElementById('btn-add-produto-saida').addEventListener('click', () => {
+  produtosSaidaFormState.push({ nome:'', quantidade:1 });
+  renderProdutosSaidaForm();
+});
+
+function abrirFormNfSaida(cargaId){
+  const carga = getCarga(cargaId);
+  const ns = carga.nfSaida || {};
+  document.getElementById('nfsaida-numero-input').value = ns.numero || '';
+  document.getElementById('nfsaida-cliente-input').value = ns.cliente || '';
+  document.getElementById('nfsaida-endereco-input').value = ns.endereco || '';
+  produtosSaidaFormState = (ns.produtos && ns.produtos.length)
+    ? ns.produtos.map(p => ({...p}))
+    : carga.produtos.map(p => ({...p}));
+  renderProdutosSaidaForm();
+  showView('view-nfsaida-form');
+}
+
+document.getElementById('btn-back-turno-nfsaida').addEventListener('click', () => showView('view-turno'));
+
+document.getElementById('btn-salvar-nfsaida').addEventListener('click', () => {
+  const carga = getCarga();
+  const numero = document.getElementById('nfsaida-numero-input').value.trim();
+  const cliente = document.getElementById('nfsaida-cliente-input').value.trim();
+  const endereco = document.getElementById('nfsaida-endereco-input').value.trim();
+  const produtos = produtosSaidaFormState.filter(p => p.nome.trim().length > 0 && p.quantidade > 0);
+  const totalItens = produtos.reduce((sum,p) => sum + p.quantidade, 0);
+
+  carga.nfSaida = { numero: numero || '—', cliente: cliente || 'Cliente não informado', endereco: endereco || '—', produtos, itens: totalItens };
+
+  // popular datalists de origem/destino com esse endereço, se ainda não existir
+  refreshOrigemDestinoDatalists();
+
+  renderCargaCard();
+  refreshAll();
+  showView('view-turno');
+  document.getElementById('cd-anchor').scrollIntoView({behavior:'smooth', block:'start'});
+});
+
+function refreshOrigemDestinoDatalists(){
+  const origens = new Set();
+  const destinos = new Set();
+  cargas.forEach(c => {
+    const od = findStageInCarga(c, 'origemdestino');
+    if(od.origem) origens.add(od.origem);
+    if(od.destino) destinos.add(od.destino);
+  });
+  document.getElementById('origens-datalist').innerHTML = [...origens].map(o => `<option value="${escapeHtml(o)}">`).join('');
+  document.getElementById('destinos-datalist').innerHTML = [...destinos].map(d => `<option value="${escapeHtml(d)}">`).join('');
+}
+
+/* ---------------- VIAGEM (DT) ---------------- */
+let viagemFormTarget = null; // { cargaId, stageId }
+let motoristaCnhFoto = null;
+
+function abrirFormViagem(cargaId, stageId){
+  viagemFormTarget = { cargaId, stageId };
+  const carga = getCarga(cargaId);
+  const stage = findStageInCarga(carga, stageId);
+
+  // lista de viagens em aberto (ainda não fechadas no Retorno de todas as suas notas)
+  const abertas = viagens.filter(v => {
+    return v.notasIds.some(nid => {
+      const c = getCarga(nid);
+      if(!c) return false;
+      const retorno = findStageInCarga(c, 'retorno');
+      return pillClassFor(retorno) !== 'done';
+    }) || v.notasIds.length === 0;
+  });
+
+  const listEl = document.getElementById('viagens-abertas-list');
+  if(abertas.length === 0){
+    listEl.innerHTML = `<p class="empty-note">Nenhuma viagem em aberto no momento.</p>`;
+  } else {
+    listEl.innerHTML = abertas.map(v => `
+      <div class="viagem-list-item" data-viagem-id="${escapeHtml(v.id)}">
+        <div class="vli-top"><span class="vli-dt mono">${escapeHtml(v.id)}</span><span class="vli-count">${v.notasIds.length} nota${v.notasIds.length!==1?'s':''}</span></div>
+        <div class="vli-meta">${escapeHtml(v.motorista.nome)} · placa ${escapeHtml(v.motorista.placa||'—')}</div>
+      </div>
+    `).join('');
+    listEl.querySelectorAll('.viagem-list-item').forEach(item => {
+      item.addEventListener('click', () => {
+        vincularCargaAViagem(item.dataset.viagemId);
+      });
+    });
+  }
+
+  document.getElementById('nova-viagem-form').style.display = 'none';
+  document.getElementById('dt-numero-input').value = 'DT-' + Math.floor(1000 + Math.random()*9000);
+  document.getElementById('mot-nome-input').value = stage.operador ? stage.operador.nome : '';
+  document.getElementById('mot-matricula-input').value = stage.operador ? stage.operador.mat : '';
+  document.getElementById('mot-placa-input').value = '';
+  motoristaCnhFoto = null;
+  document.getElementById('mot-cnh-upload').innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg><input type="file" id="mot-cnh-input" accept="image/*" hidden>`;
+  wireCnhInput();
+
+  const quickList = document.getElementById('motoristas-quick-list');
+  const motoristas = operators.filter(o => o.papel === 'Motorista');
+  quickList.innerHTML = motoristas.map(o => `<div class="motorista-chip" data-nome="${escapeHtml(o.nome)}" data-mat="${escapeHtml(o.matricula)}">${escapeHtml(o.nome)}</div>`).join('');
+  quickList.querySelectorAll('.motorista-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.getElementById('mot-nome-input').value = chip.dataset.nome;
+      document.getElementById('mot-matricula-input').value = chip.dataset.mat;
+    });
+  });
+
+  showView('view-motorista-form');
+}
+
+function vincularCargaAViagem(viagemId){
+  if(!viagemFormTarget) return;
+  const carga = getCarga(viagemFormTarget.cargaId);
+  const stage = findStageInCarga(carga, viagemFormTarget.stageId);
+  const viagem = getViagem(viagemId);
+  if(!viagem) return;
+
+  if(!viagem.notasIds.includes(carga.id)) viagem.notasIds.push(carga.id);
+  stage.motorista = { nome:viagem.motorista.nome, matricula:viagem.motorista.matricula, placa:viagem.motorista.placa, cnhFoto:viagem.motorista.cnhFoto, dt:viagem.id };
+  stage.operador = { nome:viagem.motorista.nome, mat:viagem.motorista.matricula };
+  stage.atualizadoEm = new Date().toISOString();
+
+  if(carga.id === cargaAtivaId) renderCargaCycle(); else saveState();
+  showView('view-turno');
+  document.getElementById('rota-anchor').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+document.getElementById('btn-nova-viagem').addEventListener('click', () => {
+  document.getElementById('nova-viagem-form').style.display = 'block';
+});
+
+function wireCnhInput(){
+  document.getElementById('mot-cnh-upload').onclick = () => document.getElementById('mot-cnh-input').click();
+  document.getElementById('mot-cnh-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      motoristaCnhFoto = reader.result;
+      document.getElementById('mot-cnh-upload').innerHTML = `<img src="${motoristaCnhFoto}"><input type="file" id="mot-cnh-input" accept="image/*" hidden>`;
+      wireCnhInput();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+document.getElementById('btn-back-turno-motorista').addEventListener('click', () => showView('view-turno'));
+
+document.getElementById('btn-salvar-motorista').addEventListener('click', () => {
+  if(!viagemFormTarget) return;
+  const carga = getCarga(viagemFormTarget.cargaId);
+  const stage = findStageInCarga(carga, viagemFormTarget.stageId);
+  const dt = document.getElementById('dt-numero-input').value.trim() || ('DT-' + Math.floor(1000 + Math.random()*9000));
+  const nome = document.getElementById('mot-nome-input').value.trim();
+  const matricula = document.getElementById('mot-matricula-input').value.trim();
+  const placa = document.getElementById('mot-placa-input').value.trim().toUpperCase();
+
+  const novaViagem = {
+    id: dt,
+    motorista: { nome, matricula, placa, cnhFoto: motoristaCnhFoto },
+    notasIds: [carga.id],
+    criadoEm: new Date().toISOString(),
+  };
+  viagens.push(novaViagem);
+
+  stage.motorista = { nome, matricula, placa, cnhFoto: motoristaCnhFoto, dt };
+  if(nome && matricula) stage.operador = { nome, mat: matricula };
+  stage.atualizadoEm = new Date().toISOString();
+
+  if(carga.id === cargaAtivaId) renderCargaCycle(); else saveState();
+  showView('view-turno');
+  document.getElementById('rota-anchor').scrollIntoView({behavior:'smooth', block:'start'});
+});
+
+document.getElementById('trocar-carga-btn').addEventListener('click', () => {
+  renderCargasList();
+  showView('view-cargas');
+});
+document.getElementById('btn-logout-2').addEventListener('click', () => {
+  currentOperator = null;
+  document.getElementById('login-pin-panel').classList.add('hidden');
+  document.querySelectorAll('#operator-grid .op-card').forEach(c => c.classList.remove('selected'));
+  showView('view-login');
+});
+
+/* ---------------- ENCERRAR TURNO ---------------- */
+document.getElementById('btn-encerrar-turno').addEventListener('click', () => {
+  const carga = getCarga();
+  const allStages = [...carga.stagesCD, ...carga.stagesRota];
+  const pendencias = allStages.filter(s => pillClassFor(s) !== 'done');
+  const boxEl = document.getElementById('encerrar-summary-box');
+  const listEl = document.getElementById('encerrar-pendencias-list');
+
+  if(pendencias.length === 0){
+    boxEl.innerHTML = `<div class="summary-box ok">✓ Tudo certo — todas as etapas estão concluídas. Pode encerrar tranquilo.</div>`;
+    listEl.innerHTML = '';
+  } else {
+    boxEl.innerHTML = `<div class="summary-box warn">⚠ ${pendencias.length} etapa(s) ainda não concluída(s). Isso vai aparecer como pendência pra quem assumir o próximo turno.</div>`;
+    const rows = document.createElement('div');
+    rows.style.margin = '0 24px 16px';
+    rows.innerHTML = pendencias.map(s => `
+      <div class="summary-row">
+        <span class="summary-row-name">${escapeHtml(s.nome)}</span>
+        <span class="pill ${pillClassFor(s)}">${labelFor(s)}</span>
+      </div>
+    `).join('');
+    listEl.innerHTML = '';
+    listEl.appendChild(rows);
+  }
+  document.getElementById('encerrar-obs').value = '';
+  showView('view-encerrar');
+});
+
+document.getElementById('btn-back-turno-encerrar').addEventListener('click', () => showView('view-turno'));
+document.getElementById('btn-back-turno-painel').addEventListener('click', () => showView('view-turno'));
+document.getElementById('btn-back-turno-cargas').addEventListener('click', () => showView('view-turno'));
+
+document.getElementById('btn-confirmar-encerrar').addEventListener('click', () => {
+  const carga = getCarga();
+  const allStages = [...carga.stagesCD, ...carga.stagesRota];
+  const pendencias = allStages.filter(s => pillClassFor(s) !== 'done').map(s => ({ id:s.id, nome:s.nome }));
+  const agora = new Date();
+  const horaFormatada = agora.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+
+  turnosFechados.push({
+    operadorNome: currentOperator.nome,
+    matricula: currentOperator.matricula,
+    encerradoEm: agora.toISOString(),
+    horaFormatada,
+    pendencias,
+    obsGeral: document.getElementById('encerrar-obs').value.trim(),
+  });
+
+  renderHandoffBanner();
+  saveState();
+
+  currentOperator = null;
+  document.getElementById('login-pin-panel').classList.add('hidden');
+  document.querySelectorAll('#operator-grid .op-card').forEach(c => c.classList.remove('selected'));
+  showView('view-login');
+});
+
+/* ---------------- CADASTRO VIEW ---------------- */
+let cadFoto = null;
+let cadPapel = 'Operador CD';
+
+function resetCadastroForm(){
+  document.getElementById('cad-nome').value = '';
+  const nextMat = (1000 + operators.length + 12).toString().padStart(4,'0');
+  document.getElementById('cad-matricula').value = nextMat;
+  cadFoto = null;
+  cadPapel = 'Operador CD';
+  document.querySelectorAll('#view-cadastro .seg-opt').forEach(s => s.classList.toggle('active', s.dataset.papel === cadPapel));
+  document.getElementById('cad-avatar-upload').innerHTML = `
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>
+    <input type="file" id="cad-avatar-input" accept="image/*" hidden>
+  `;
+  document.getElementById('cad-avatar-input').addEventListener('change', handleAvatarUpload);
+  document.getElementById('cad-pin-panel').classList.add('hidden');
+  validateCadForm();
+}
+
+document.getElementById('cad-avatar-upload').addEventListener('click', () => {
+  document.getElementById('cad-avatar-input').click();
+});
+document.getElementById('cad-avatar-input').addEventListener('change', handleAvatarUpload);
+
+function handleAvatarUpload(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result;
+    cadFoto = dataUrl;
+    document.getElementById('cad-avatar-upload').innerHTML = `<img src="${dataUrl}"><input type="file" id="cad-avatar-input" accept="image/*" hidden>`;
+    document.getElementById('cad-avatar-input').addEventListener('change', handleAvatarUpload);
+  };
+  reader.readAsDataURL(file);
+}
+
+document.querySelectorAll('#view-cadastro .seg-opt').forEach(seg => {
+  seg.addEventListener('click', () => {
+    document.querySelectorAll('#view-cadastro .seg-opt').forEach(s => s.classList.remove('active'));
+    seg.classList.add('active');
+    cadPapel = seg.dataset.papel;
+  });
+});
+
+document.getElementById('cad-nome').addEventListener('input', validateCadForm);
+document.getElementById('cad-matricula').addEventListener('input', validateCadForm);
+function validateCadForm(){
+  const ok = document.getElementById('cad-nome').value.trim().length > 2 && document.getElementById('cad-matricula').value.trim().length > 0;
+  document.getElementById('btn-cadastrar').disabled = !ok;
+}
+
+document.getElementById('btn-cadastrar').addEventListener('click', () => {
+  cadNewOperator = {
+    nome: document.getElementById('cad-nome').value.trim(),
+    matricula: document.getElementById('cad-matricula').value.trim(),
+    papel: cadPapel,
+    foto: cadFoto,
+    pin: ''
+  };
+  document.getElementById('cad-pin-panel').classList.remove('hidden');
+  renderPinDots('cad-pin-dots', 0);
+  buildKeypad(document.getElementById('cad-keypad'), (k) => {
+    if(k === '⌫'){ cadNewOperator.pin = cadNewOperator.pin.slice(0,-1); }
+    else if(cadNewOperator.pin.length < 4){ cadNewOperator.pin += k; }
+    renderPinDots('cad-pin-dots', cadNewOperator.pin.length);
+    if(cadNewOperator.pin.length === 4){
+      setTimeout(() => {
+        operators.push(cadNewOperator);
+        renderOperatorGrid();
+        saveState();
+        if(isFirstRun){
+          isFirstRun = false;
+          showView('view-login');
+        } else {
+          currentOperator = cadNewOperator;
+          enterTurno();
+        }
+      }, 180);
+    }
+  });
+  document.getElementById('cad-pin-panel').scrollIntoView({behavior:'smooth', block:'nearest'});
+});
+
+/* ---------------- ENTER TURNO ---------------- */
+function enterTurno(){
+  document.getElementById('you-name').textContent = currentOperator.nome;
+  document.getElementById('you-mat').textContent = `Matrícula ${currentOperator.matricula}`;
+  const avatarEl = document.getElementById('you-avatar');
+  avatarEl.innerHTML = currentOperator.foto ? `<img src="${currentOperator.foto}">` : initials(currentOperator.nome);
+  renderCargasList();
+  showView('view-cargas');
+  window.scrollTo({top:0});
+}
+
+/* ---------------- TURNO: etapas ---------------- */
+const ICONS = {
+  recebimento: '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/>',
+  conferencia: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
+  origemdestino: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  separacao: '<path d="M9 6h11M9 12h11M9 18h11M5 6h.01M5 12h.01M5 18h.01"/>',
+  expedicao: '<path d="M16 3h-1a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h1M8 3h1a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8M3 9h2M3 15h2M19 9h2M19 15h2"/>',
+  transporte: '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M14 9h4l4 4v4a1 1 0 0 1-1 1h-2"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+  entrega: '<path d="M4 22V4a1 1 0 0 1 1-1h13a1 1 0 0 1 1 1v18l-7.5-4L4 22Z"/>',
+  retorno: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/>',
+};
+const FILE_ICON = '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/>';
+
+const STATUS_META = {
+  done:     { label:'Concluído',    pillClass:'done' },
+  progress: { label:'Em andamento', pillClass:'progress' },
+  pending:  { label:'Pendente',     pillClass:'pending' },
+  alert:    { label:'Atenção',      pillClass:'alert' },
+};
+const SPECIAL_OPTIONS = {
+  'done':            { label:'Entregue',        pillClass:'done' },
+  'alert-ausente':   { label:'Cliente ausente', pillClass:'alert' },
+  'alert-recusado':  { label:'Recusado',        pillClass:'alert' },
+  'alert-avariado':  { label:'Avariado',        pillClass:'alert' },
+};
+
+function pillClassFor(s){ return s.special ? (SPECIAL_OPTIONS[s.status]?.pillClass||'pending') : (STATUS_META[s.status]?.pillClass||'pending'); }
+function labelFor(s){ return s.special ? (SPECIAL_OPTIONS[s.status]?.label||'Pendente') : (STATUS_META[s.status]?.label||'Pendente'); }
+
+const STAGE_ORDER = ['recebimento','conferencia','origemdestino','separacao','expedicao','transporte','entrega','retorno'];
+const stageElements = {}; // id -> { li, card, previewEl, stage }
+function findStageInCarga(carga, id){ return carga.stagesCD.find(s => s.id === id) || carga.stagesRota.find(s => s.id === id); }
+
+function applyLocking(){
+  let prevDone = true;
+  STAGE_ORDER.forEach(id => {
+    const entry = stageElements[id];
+    if(!entry) return;
+    const unlocked = prevDone;
+    entry.li.classList.toggle('locked', !unlocked);
+    if(!unlocked){
+      entry.card.classList.remove('open');
+      entry.previewEl.className = 'stage-preview empty';
+      entry.previewEl.textContent = '🔒 Aguardando etapa anterior';
+    } else {
+      updatePreview(entry.stage, entry.previewEl);
+    }
+    prevDone = pillClassFor(entry.stage) === 'done';
+  });
+}
+
+function renderCargaStepper(){
+  const combined = STAGE_ORDER.map(id => stageElements[id]?.stage).filter(Boolean);
+  if(combined.length !== STAGE_ORDER.length) return; // not all rendered yet
+  let doneCount = 0, currentIdx = -1;
+  combined.forEach((s,i) => {
+    if(pillClassFor(s) === 'done') doneCount++;
+    else if(currentIdx === -1) currentIdx = i;
+  });
+  const total = combined.length;
+  const allDone = currentIdx === -1;
+  const currentStage = allDone ? combined[total-1] : combined[currentIdx];
+  const currentStatus = pillClassFor(currentStage);
+  const currentNumero = allDone ? total : currentIdx+1;
+
+  document.getElementById('stepper-line-fill').style.width = ((doneCount/total)*100) + '%';
+
+  const nodesContainer = document.getElementById('stepper-nodes');
+  nodesContainer.innerHTML = '';
+  combined.forEach((s,i) => {
+    const dot = document.createElement('div');
+    let cls = 'step-node';
+    if(i < doneCount) cls += ' done';
+    else if(i === currentIdx) cls += (currentStatus === 'alert' ? ' blocked' : ' current');
+    dot.className = cls;
+    nodesContainer.appendChild(dot);
+  });
+
+  const statusRow = document.getElementById('carga-status-row');
+  const statusText = document.getElementById('carga-status-text');
+  const respName = currentStage.operador ? currentStage.operador.nome : 'ninguém atribuído';
+
+  if(allDone){
+    statusRow.className = 'status-row done-all';
+    statusText.innerHTML = `Ciclo concluído — carga entregue`;
+  } else if(currentStatus === 'alert'){
+    statusRow.className = 'status-row blocked';
+    statusText.innerHTML = `Bloqueada em <b>${escapeHtml(currentStage.nome)}</b> — pendência não resolvida`;
+  } else {
+    statusRow.className = 'status-row';
+    statusText.innerHTML = `Próxima etapa: <b>${escapeHtml(currentStage.nome)}</b> · resp. ${escapeHtml(respName)}`;
+  }
+
+  const captionCurrent = document.getElementById('stepper-current-label');
+  captionCurrent.textContent = `${currentStage.nome} · ${currentNumero}/${total}`;
+  captionCurrent.className = 'current-label' + (currentStatus === 'alert' ? ' is-blocked' : '');
+}
+
+function refreshAll(){
+  applyLocking();
+  renderPainel();
+  renderCargaStepper();
+  renderTabInfo();
+  saveState();
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function timeSince(){ return 'agora'; } // placeholder for future real timestamps
+
+function renderPainel(){
+  const carga = getCarga();
+  const combined = [
+    ...carga.stagesCD.map((s,i) => ({ stage:s, numero:i+1 })),
+    ...carga.stagesRota.map((s,i) => ({ stage:s, numero:i+6 })),
+  ];
+
+  let done=0, alert=0, progress=0, pending=0;
+  combined.forEach(({stage}) => {
+    const c = pillClassFor(stage);
+    if(c==='done') done++;
+    else if(c==='alert') alert++;
+    else if(c==='progress') progress++;
+    else pending++;
+  });
+
+  const total = combined.length;
+  const kpiGrid = document.getElementById('kpi-grid');
+  const kpiDefs = [
+    ['k-done', done, 'Concluídas'],
+    ['k-alert', alert, 'Em atenção'],
+    ['k-progress', progress, 'Em andamento'],
+    ['k-pending', pending, 'Pendentes'],
+  ];
+  kpiGrid.innerHTML = kpiDefs.map(([cls, count, label]) => `
+    <div class="kpi-tile ${cls}">
+      <div class="kt-value">${count}<span style="font-size:13px; color:var(--text-dim); font-weight:500;">/${total}</span></div>
+      <div class="kt-label">${label}</div>
+    </div>
+  `).join('');
+
+  const barWrap = document.getElementById('painel-bar-wrap');
+  barWrap.innerHTML = '';
+  const segs = [ ['done', done], ['alert', alert], ['progress', progress] ];
+  segs.forEach(([cls, count]) => {
+    if(count > 0){
+      const seg = document.createElement('div');
+      seg.className = `painel-bar-seg ${cls}`;
+      seg.style.width = ((count/total)*100) + '%';
+      barWrap.appendChild(seg);
+    }
+  });
+
+  const listEl = document.getElementById('painel-list');
+  listEl.innerHTML = '';
+  combined.forEach(({stage, numero}) => {
+    const opText = stage.operador ? `${stage.operador.nome} · mat. ${stage.operador.mat}` : 'não atribuído';
+    const attTxt = stage.attachments.length > 0 ? ` · 📎 ${stage.attachments.length}` : '';
+    const timeTxt = stage.atualizadoEm ? ` · ${formatHora(stage.atualizadoEm)}` : '';
+    const isLocked = stageElements[stage.id]?.li.classList.contains('locked');
+    const row = document.createElement('div');
+    row.className = 'painel-row' + (isLocked ? ' is-locked' : '');
+    row.innerHTML = `
+      <div class="painel-ic ${pillClassFor(stage)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[stage.icon]}</svg></div>
+      <div class="painel-row-main">
+        <p class="painel-row-name">${numero}. ${stage.nome}${isLocked ? ' 🔒' : ''}</p>
+        <p class="painel-row-meta"><span class="mono">${escapeHtml(opText)}</span>${attTxt}${timeTxt}</p>
+      </div>
+      <span class="pill ${pillClassFor(stage)}">${labelFor(stage)}</span>
+    `;
+    listEl.appendChild(row);
+  });
+}
+function formatHora(iso){
+  try{ return new Date(iso).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }); }
+  catch(e){ return ''; }
+}
+
+function renderTabInfo(){
+  const carga = getCarga();
+  const cdStages = carga.stagesCD;
+  const rotaStages = carga.stagesRota;
+  const allStages = [...cdStages, ...rotaStages];
+
+  const doneTotal = allStages.filter(s => pillClassFor(s) === 'done').length;
+  const painelTabLabel = document.querySelector('#bt-painel span');
+  if(painelTabLabel) painelTabLabel.textContent = `Painel · ${doneTotal}/${allStages.length}`;
+
+  function summarizeGroup(group){
+    const hasAlert = group.some(s => pillClassFor(s) === 'alert');
+    const allDone = group.every(s => pillClassFor(s) === 'done');
+    const hasProgress = group.some(s => pillClassFor(s) === 'progress');
+    if(hasAlert) return { text:'Atenção', state:'alert' };
+    if(allDone) return { text:'OK', state:'done' };
+    if(hasProgress) return { text:'Em andamento', state:'progress' };
+    return { text:'Pendente', state:'pending' };
+  }
+  const cdInfo = summarizeGroup(cdStages);
+  setTab('tab-cd-value', cdInfo.text, cdInfo.state);
+  const rotaInfo = summarizeGroup(rotaStages);
+  setTab('tab-rota-value', rotaInfo.text, rotaInfo.state);
+
+  const blockedStage = allStages.find(s => pillClassFor(s) === 'alert');
+  if(blockedStage){
+    setTab('tab-carga-value', 'Bloqueada', 'alert');
+  } else {
+    const firstPending = allStages.find(s => pillClassFor(s) !== 'done');
+    setTab('tab-carga-value', firstPending ? 'Em curso' : 'Concluída', firstPending ? 'progress' : 'done');
+  }
+}
+function setTab(id, text, state){
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = `tabbtn-value state-${state}`;
+}
+
+function renderCargaCard(){
+  const carga = getCarga();
+  document.getElementById('carga-id-display').textContent = carga.id;
+  document.getElementById('carga-itens-display').textContent = carga.itens;
+  document.getElementById('carga-nf-display').textContent = carga.nf;
+
+  const nfSaidaMeta = document.getElementById('carga-nfsaida-meta');
+  if(carga.nfSaida){
+    document.getElementById('carga-cliente-display').textContent = carga.nfSaida.cliente;
+    document.getElementById('carga-endereco-display').textContent = carga.nfSaida.endereco;
+    nfSaidaMeta.textContent = `NF saída ${carga.nfSaida.numero} · ${carga.nfSaida.itens} itens`;
+  } else {
+    document.getElementById('carga-cliente-display').textContent = 'NF de saída ainda não lançada';
+    document.getElementById('carga-endereco-display').textContent = `Fornecedor (entrada): ${carga.fornecedor || '—'}`;
+    nfSaidaMeta.textContent = '';
+  }
+
+  const painelTitulo = document.getElementById('painel-titulo-carga');
+  if(painelTitulo) painelTitulo.textContent = `Carga ${carga.id}`;
+}
+
+function renderHandoffBanner(){
+  const bannerEl = document.getElementById('handoff-banner');
+  if(turnosFechados.length === 0){
+    bannerEl.style.display = 'none';
+    return;
+  }
+  const last = turnosFechados[turnosFechados.length - 1];
+  if(!last.pendencias || last.pendencias.length === 0){
+    bannerEl.style.display = 'none';
+    return;
+  }
+  bannerEl.style.display = '';
+  const pendNames = last.pendencias.map(p => p.nome).join(', ');
+  document.getElementById('banner-body-text').innerHTML =
+    `${escapeHtml(last.operadorNome)} (mat. <b>${escapeHtml(last.matricula)}</b>) encerrou às ${escapeHtml(last.horaFormatada)} com pendência em <b>${escapeHtml(pendNames)}</b>.`;
+}
+
+function updatePreview(stage, previewEl){
+  const hasObs = stage.obs && stage.obs.trim().length > 0;
+  const nAtt = stage.attachments.length;
+  if(!hasObs && nAtt === 0){
+    previewEl.className = 'stage-preview empty';
+    previewEl.innerHTML = 'Sem registro ainda';
+    return;
+  }
+  previewEl.className = 'stage-preview';
+  const snippet = hasObs ? `<span class="snippet">${escapeHtml(stage.obs)}</span>` : '';
+  const attBadge = nAtt > 0
+    ? `<span class="attach-count"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>${nAtt}</span>`
+    : '';
+  previewEl.innerHTML = snippet + attBadge;
+}
+
+function renderAttachChips(stage, chipsEl, previewEl){
+  chipsEl.innerHTML = '';
+  stage.attachments.forEach((att, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'attach-chip';
+    const preview = att.isImage
+      ? `<img class="thumb" src="${att.url}">`
+      : `<div class="file-ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${FILE_ICON}</svg></div>`;
+    chip.innerHTML = `${preview}<span class="fname">${escapeHtml(att.name)}</span><span class="rm" data-rm="${i}">×</span>`;
+    chip.querySelector('.rm').addEventListener('click', (e) => {
+      e.stopPropagation();
+      stage.attachments.splice(i,1);
+      renderAttachChips(stage, chipsEl, previewEl);
+      if(previewEl) updatePreview(stage, previewEl);
+      refreshAll();
+    });
+    chipsEl.appendChild(chip);
+  });
+}
+
+function renderGroup(container, stages, startIndex){
+  stages.forEach((stage, i) => {
+    const idx = startIndex + i;
+    const li = document.createElement('li');
+    li.className = 'stage';
+    const lineClass = stage.handoff ? 'stage-line handoff' : 'stage-line';
+    const opText = stage.operador
+      ? `<span class="mono">${stage.operador.nome}</span> · mat. <span class="mono">${stage.operador.mat}</span>`
+      : `<span class="tag-unassigned">ainda não atribuído</span>`;
+    const chipsHtml = stage.options.map(opt => {
+      const meta = stage.special ? SPECIAL_OPTIONS[opt] : STATUS_META[opt];
+      const activeClass = stage.status === opt ? `active-${meta.pillClass}` : '';
+      return `<div class="chip ${activeClass}" data-opt="${opt}">${meta.label}</div>`;
+    }).join('');
+
+    const motoristaBlockHtml = stage.id === 'transporte' ? `
+      <div class="motorista-block" data-motorista-block>
+        ${stage.motorista && stage.motorista.nome ? `
+          <div class="motorista-info-box">
+            ${stage.motorista.cnhFoto ? `<img class="mi-cnh" src="${stage.motorista.cnhFoto}">` : ''}
+            <div class="mi-text"><b>${escapeHtml(stage.motorista.nome)}</b> · mat. ${escapeHtml(stage.motorista.matricula || '—')}<br>Placa <b>${escapeHtml(stage.motorista.placa || '—')}</b>${stage.motorista.dt ? ` · DT <b>${escapeHtml(stage.motorista.dt)}</b>` : ''}</div>
+          </div>
+          <div class="attach-btn" data-abrir-motorista style="margin-top:8px;">✎ Trocar viagem</div>
+        ` : `
+          <div class="attach-btn" data-abrir-motorista style="margin-top:9px;">🚚 Atribuir à viagem</div>
+        `}
+      </div>
+    ` : '';
+
+    const origemDestinoBlockHtml = stage.id === 'origemdestino' ? `
+      <div class="form-group" style="padding:0; margin-bottom:10px;">
+        <label class="form-label">De onde vem a carga</label>
+        <input class="form-input" list="origens-datalist" data-od-origem value="${escapeHtml(stage.origem||'')}" placeholder="Ex: Fábrica Petrópolis — Alagoinhas/BA" />
+      </div>
+      <div class="form-group" style="padding:0; margin-bottom:10px;">
+        <label class="form-label">Quem está recebendo</label>
+        <input class="form-input" list="destinos-datalist" data-od-destino value="${escapeHtml(stage.destino||'')}" placeholder="Ex: CD Feira de Santana" />
+      </div>
+    ` : '';
+
+    const nfSaidaBlockHtml = stage.id === 'separacao' ? `
+      <div class="motorista-block" data-nfsaida-block>
+        ${getCarga() && getCarga().nfSaida ? `
+          <div class="motorista-info-box">
+            <div class="mi-text"><b>NF ${escapeHtml(getCarga().nfSaida.numero||'—')}</b> · ${escapeHtml(getCarga().nfSaida.cliente||'—')}<br>${escapeHtml(getCarga().nfSaida.endereco||'—')}</div>
+          </div>
+          <div class="attach-btn" data-abrir-nfsaida style="margin-top:8px;">✎ Editar nota de saída</div>
+        ` : `
+          <div class="attach-btn" data-abrir-nfsaida style="margin-top:9px;">📝 Lançar nota de saída</div>
+        `}
+      </div>
+    ` : '';
+
+    li.innerHTML = `
+      <div class="${lineClass}"></div>
+      ${stage.handoff ? `<div class="handoff-tag">⇄ passagem</div>` : ''}
+      <div class="marker ${pillClassFor(stage)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[stage.icon]}</svg></div>
+      <div class="card">
+        <div class="card-head">
+          <div class="ch-left"><p class="stage-role">${idx}. ${stage.role}</p><p class="stage-name">${stage.nome}</p><p class="stage-preview" data-preview></p></div>
+          <div class="ch-right">
+            <span class="pill ${pillClassFor(stage)}" data-pill>${labelFor(stage)}</span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-body-inner">
+            <div class="operator-row">Responsável: ${opText}</div>
+            ${motoristaBlockHtml}
+            ${nfSaidaBlockHtml}
+            ${origemDestinoBlockHtml}
+            <div class="chip-row" data-chips>${chipsHtml}</div>
+            <textarea placeholder="Observação sobre esta etapa...">${stage.obs}</textarea>
+            <div class="attach-row">
+              <label class="attach-btn">
+                📎 Anexar foto ou arquivo
+                <input type="file" multiple accept="image/*,.pdf,.doc,.docx" hidden data-file-input>
+              </label>
+            </div>
+            <div class="attach-chips" data-attach-chips></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const card = li.querySelector('.card');
+    const previewEl = li.querySelector('[data-preview]');
+    const operatorRowEl = li.querySelector('.operator-row');
+    stageElements[stage.id] = { li, card, previewEl, stage };
+
+    const motoristaBtn = li.querySelector('[data-abrir-motorista]');
+    if(motoristaBtn){
+      motoristaBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        abrirFormViagem(cargaAtivaId, stage.id);
+      });
+    }
+
+    const nfSaidaBtn = li.querySelector('[data-abrir-nfsaida]');
+    if(nfSaidaBtn){
+      nfSaidaBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        abrirFormNfSaida(cargaAtivaId);
+      });
+    }
+
+    const odOrigem = li.querySelector('[data-od-origem]');
+    const odDestino = li.querySelector('[data-od-destino]');
+    if(odOrigem && odDestino){
+      const syncOD = () => {
+        stage.origem = odOrigem.value.trim();
+        stage.destino = odDestino.value.trim();
+        stage.atualizadoEm = new Date().toISOString();
+        if(!stage.operador && currentOperator){
+          stage.operador = { nome: currentOperator.nome, mat: currentOperator.matricula };
+          refreshOperatorRow();
+        }
+        if(stage.origem && stage.destino && stage.status === 'pending'){
+          stage.status = 'done';
+          const pill = li.querySelector('[data-pill]');
+          pill.className = `pill ${pillClassFor(stage)}`;
+          pill.textContent = labelFor(stage);
+          li.querySelector('.marker').className = `marker ${pillClassFor(stage)}`;
+        }
+        refreshAll();
+      };
+      odOrigem.addEventListener('click', (e) => e.stopPropagation());
+      odDestino.addEventListener('click', (e) => e.stopPropagation());
+      odOrigem.addEventListener('change', syncOD);
+      odDestino.addEventListener('change', syncOD);
+    }
+
+    function refreshOperatorRow(){
+      const txt = stage.operador
+        ? `<span class="mono">${escapeHtml(stage.operador.nome)}</span> · mat. <span class="mono">${escapeHtml(stage.operador.mat)}</span>`
+        : `<span class="tag-unassigned">ainda não atribuído</span>`;
+      operatorRowEl.innerHTML = `Responsável: ${txt}`;
+    }
+
+    function claimIfNeeded(){
+      if(!stage.operador && currentOperator){
+        stage.operador = { nome: currentOperator.nome, mat: currentOperator.matricula };
+        refreshOperatorRow();
+      }
+      stage.atualizadoEm = new Date().toISOString();
+    }
+
+    li.querySelector('.card-head').addEventListener('click', () => {
+      if(li.classList.contains('locked')) return;
+      card.classList.toggle('open');
+    });
+    li.querySelectorAll('[data-chips] .chip').forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const opt = chip.dataset.opt;
+
+        if(stage.id === 'recebimento' && opt === 'done' && stage.attachments.length === 0){
+          alert('Anexe pelo menos uma foto antes de concluir o Recebimento.');
+          return;
+        }
+        if(stage.id === 'conferencia' && opt === 'alert' && stage.obs.trim().length === 0){
+          alert('Descreva o que não está de acordo antes de marcar Atenção.');
+          const ta = li.querySelector('textarea');
+          card.classList.add('open');
+          ta.focus();
+          return;
+        }
+
+        claimIfNeeded();
+        stage.status = opt;
+        const pill = li.querySelector('[data-pill]');
+        pill.className = `pill ${pillClassFor(stage)}`;
+        pill.textContent = labelFor(stage);
+        li.querySelector('.marker').className = `marker ${pillClassFor(stage)}`;
+        li.querySelectorAll('[data-chips] .chip').forEach(c => {
+          const cMeta = stage.special ? SPECIAL_OPTIONS[c.dataset.opt] : STATUS_META[c.dataset.opt];
+          c.className = 'chip' + (c.dataset.opt === opt ? ` active-${cMeta.pillClass}` : '');
+        });
+        refreshAll();
+      });
+    });
+
+    const fileInput = li.querySelector('[data-file-input]');
+    const chipsEl = li.querySelector('[data-attach-chips]');
+    const textareaEl = li.querySelector('textarea');
+
+    updatePreview(stage, previewEl);
+
+    textareaEl.addEventListener('input', (e) => {
+      claimIfNeeded();
+      stage.obs = e.target.value;
+      updatePreview(stage, previewEl);
+      refreshAll();
+    });
+
+    fileInput.addEventListener('click', (e) => e.stopPropagation());
+    fileInput.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      Promise.all(files.map(file => new Promise((resolve) => {
+        const isImage = file.type.startsWith('image/');
+        const reader = new FileReader();
+        reader.onload = () => resolve({ name:file.name, url:reader.result, isImage });
+        reader.readAsDataURL(file);
+      }))).then(newAttachments => {
+        claimIfNeeded();
+        stage.attachments.push(...newAttachments);
+        renderAttachChips(stage, chipsEl, previewEl);
+        updatePreview(stage, previewEl);
+        refreshAll();
+      });
+      fileInput.value = '';
+    });
+
+    container.appendChild(li);
+  });
+}
+
+function renderCargaCycle(){
+  const carga = getCarga();
+  document.getElementById('timeline-cd').innerHTML = '';
+  document.getElementById('timeline-rota').innerHTML = '';
+  Object.keys(stageElements).forEach(k => delete stageElements[k]);
+  renderGroup(document.getElementById('timeline-cd'), carga.stagesCD, 1);
+  renderGroup(document.getElementById('timeline-rota'), carga.stagesRota, 6);
+  renderCargaCard();
+  refreshAll();
+}
+
+function claimFirstOpenStage(carga){
+  if(!currentOperator) return;
+  for(const id of STAGE_ORDER){
+    const stage = findStageInCarga(carga, id);
+    if(pillClassFor(stage) !== 'done'){
+      if(!stage.operador){
+        stage.operador = { nome: currentOperator.nome, mat: currentOperator.matricula };
+        stage.atualizadoEm = new Date().toISOString();
+      }
+      break;
+    }
+  }
+}
+
+function progressoCarga(carga){
+  const all = [...carga.stagesCD, ...carga.stagesRota];
+  const done = all.filter(s => pillClassFor(s) === 'done').length;
+  return { done, total: all.length };
+}
+
+function renderCargasList(){
+  const listEl = document.getElementById('cargas-list');
+  listEl.innerHTML = '';
+  cargas.forEach(carga => {
+    const { done, total } = progressoCarga(carga);
+    const isComplete = done === total;
+    const clienteTxt = carga.nfSaida ? carga.nfSaida.cliente : `Fornecedor: ${carga.fornecedor || '—'}`;
+    const enderecoTxt = carga.nfSaida ? carga.nfSaida.endereco : 'NF de saída ainda não lançada';
+    const item = document.createElement('div');
+    item.className = 'carga-list-item' + (isComplete ? ' is-complete' : '');
+    item.innerHTML = `
+      <div class="cli-top">
+        <div>
+          <div class="cli-id">Carga <b class="mono">${escapeHtml(carga.id)}</b> · NF entrada <span class="mono">${escapeHtml(carga.nf)}</span></div>
+          <p class="cli-cliente">${escapeHtml(clienteTxt)}</p>
+        </div>
+        <div class="cli-progress">${done}/${total}${isComplete ? ' ✓' : ''}</div>
+      </div>
+      <div class="cli-meta">${escapeHtml(enderecoTxt)}</div>
+      <div class="cli-bar"><div class="cli-bar-fill" style="width:${(done/total)*100}%"></div></div>
+    `;
+    item.addEventListener('click', () => {
+      cargaAtivaId = carga.id;
+      claimFirstOpenStage(carga);
+      renderCargaCycle();
+      saveState();
+      showView('view-turno');
+      window.scrollTo({top:0});
+    });
+    listEl.appendChild(item);
+  });
+}
+
+function abrirPainel(){
+  renderPainel();
+  renderColaboradores();
+  renderTimelineEventos();
+  showView('view-painel');
+  window.scrollTo({top:0});
+}
+
+function renderColaboradores(){
+  const carga = getCarga();
+  const all = [...carga.stagesCD, ...carga.stagesRota];
+  const map = {};
+  all.forEach(s => {
+    if(!s.operador) return;
+    const key = s.operador.mat;
+    if(!map[key]) map[key] = { nome:s.operador.nome, mat:s.operador.mat, count:0, ultima:null };
+    map[key].count++;
+    if(s.atualizadoEm && (!map[key].ultima || s.atualizadoEm > map[key].ultima)) map[key].ultima = s.atualizadoEm;
+  });
+  const list = Object.values(map).sort((a,b) => (b.ultima||'').localeCompare(a.ultima||''));
+  const card = document.getElementById('colaboradores-card');
+  if(list.length === 0){
+    card.innerHTML = `<p class="empty-note">Ninguém tocou nessa carga ainda.</p>`;
+    return;
+  }
+  card.innerHTML = list.map(c => {
+    const op = operators.find(o => o.matricula === c.mat);
+    const avatar = op?.foto ? `<img src="${op.foto}">` : initials(c.nome);
+    const ultimaTxt = c.ultima ? `última ação ${formatHora(c.ultima)}` : 'sem horário registrado';
+    return `
+      <div class="colab-row">
+        <div class="colab-avatar">${avatar}</div>
+        <div class="colab-info">
+          <div class="colab-name">${escapeHtml(c.nome)}</div>
+          <div class="colab-meta mono">mat. ${escapeHtml(c.mat)} · ${ultimaTxt}</div>
+        </div>
+        <div class="colab-count">${c.count} etapa${c.count>1?'s':''}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderTimelineEventos(){
+  const carga = getCarga();
+  const all = [...carga.stagesCD, ...carga.stagesRota].filter(s => s.atualizadoEm);
+  const card = document.getElementById('timeline-eventos-card');
+  if(all.length === 0){
+    card.innerHTML = `<p class="empty-note">Nenhum evento registrado ainda nessa carga.</p>`;
+    return;
+  }
+  const sorted = [...all].sort((a,b) => (b.atualizadoEm||'').localeCompare(a.atualizadoEm||''));
+  card.innerHTML = sorted.map(s => `
+    <div class="evento-row">
+      <div class="evento-time mono">${formatHora(s.atualizadoEm)}</div>
+      <div class="evento-body">
+        <div class="evento-title">${escapeHtml(s.nome)} — ${labelFor(s)}</div>
+        <div class="evento-sub">${s.operador ? escapeHtml(s.operador.nome) : 'sem responsável'}${s.obs ? ' · ' + escapeHtml(s.obs.slice(0,60)) + (s.obs.length>60?'…':'') : ''}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function boot(){
+  await loadState();
+
+  renderCargaCycle();
+  renderOperatorGrid();
+  renderCompanyChip();
+  renderHandoffBanner();
+  refreshOrigemDestinoDatalists();
+  updateTurnoHeaderCompany();
+  resetCadastroForm();
+
+  isFirstRun = !empresa.nome;
+  if(isFirstRun){
+    document.getElementById('btn-back-login-2').style.display = 'none';
+    document.getElementById('btn-salvar-empresa').textContent = 'Salvar e cadastrar operadores';
+    showView('view-empresa');
+  } else {
+    showView('view-login');
+  }
+
+  if(!hasStorage){
+    console.warn('window.storage indisponível neste contexto — os dados não serão salvos entre sessões (normal se o arquivo foi aberto fora do preview de artifacts).');
+  }
+}
+boot();
+</script>
+
+</body>
+</html>
